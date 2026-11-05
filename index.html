@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#293133">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Raport produkcji</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="ikona-192.png">
+<style>
+/* Kolory z palety RAL używanej na maszynach:
+   7035 jasnoszary (obudowy), 7016 antracyt, 6024 zieleń, 1003 żółty sygnałowy, 3020 czerwień, 5015 błękit */
+:root{
+  --plyta:#CBD0CC; --panel:#DCE0DB; --jasny:#F1F2EF; --bialy:#FFFFFF;
+  --tusz:#293133; --tusz2:#4F5958; --krawedz:#98A09B; --krawedz2:#7C847F;
+  --ziel:#008351; --ziel2:#00643E; --zolty:#F9A800; --zolty-tlo:#FFF0C7; --zolty2:#A56F00;
+  --czer:#CC0605; --nieb:#2271B3; --nieb2:#174E7C;
+  --txt:'Bahnschrift','Roboto','Segoe UI','DejaVu Sans',system-ui,sans-serif;
+  --war:'Bahnschrift SemiCondensed','Roboto Condensed','sans-serif-condensed','Arial Narrow','DejaVu Sans Condensed',sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--plyta);color:var(--tusz);font-family:var(--txt);font-size:18px;line-height:1.35;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;overflow:hidden}
+button{font:inherit;color:inherit;touch-action:manipulation;cursor:pointer;-webkit-appearance:none;appearance:none;margin:0}
+button:disabled{cursor:default}
+input{font:inherit;-webkit-user-select:text;user-select:text}
+:focus{outline:none}
+:focus-visible{outline:3px solid var(--nieb);outline-offset:2px}
+h1,h2{margin:0;font-family:var(--war);font-weight:700;line-height:1.05}
+svg{display:block}
+.num{font-variant-numeric:tabular-nums}
+#app{height:100vh;height:100dvh;display:flex;flex-direction:column}
+
+/* ---------- ekran logowania ---------- */
+.login{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:24px;padding:24px}
+.tabliczka{border:0;border-radius:12px;background:var(--tusz);color:var(--jasny);padding:36px 40px;display:flex;flex-direction:column;
+  justify-content:space-between;text-align:left;min-height:0;overflow:hidden}
+.tabliczka-stan{font-family:var(--war);font-weight:700;font-size:clamp(72px,11.5vw,190px);line-height:.9;letter-spacing:-.01em;min-width:0;overflow:hidden;white-space:nowrap}
+.tabliczka-stan.zawijaj{white-space:normal;overflow-wrap:anywhere}
+.tabliczka-dol{display:flex;flex-direction:column;gap:6px}
+.tabliczka-zegar{font-family:var(--war);font-weight:600;font-size:clamp(56px,7vw,100px);line-height:1;font-variant-numeric:tabular-nums}
+.tabliczka-data{font-size:22px;color:#B7BEB9}
+.login-prawa{display:flex;flex-direction:column;gap:20px;min-height:0;overflow-y:auto}
+.login-srodek{flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px}
+.prompt{display:flex;align-items:center;gap:28px}
+.prompt h1{font-size:clamp(40px,4.4vw,62px)}
+.prompt p{margin:10px 0 0;font-size:20px;color:var(--tusz2)}
+.fob{flex:none;width:132px;height:132px;color:var(--tusz)}
+.fob .fala{animation:fala 2.4s ease-in-out infinite}
+.fob .fala2{animation-delay:.25s}.fob .fala3{animation-delay:.5s}
+@keyframes fala{0%,100%{opacity:.2}45%{opacity:1}}
+.komunikat{background:var(--bialy);border-left:10px solid var(--czer);border-radius:6px;padding:16px 22px}
+.komunikat.info{border-left-color:var(--nieb)}
+.komunikat b{display:block;font-family:var(--war);font-size:30px;line-height:1.1}
+.komunikat p{margin:6px 0 0}
+.komunikat .uid{display:inline-block;margin-top:6px;font-family:var(--war);font-size:36px;font-weight:700;font-variant-numeric:tabular-nums;
+  -webkit-user-select:all;user-select:all;letter-spacing:.02em}
+.demo{border:2px dashed var(--krawedz2);border-radius:8px;padding:14px 16px}
+.demo p{margin:0 0 10px;color:var(--tusz2)}
+.demo-przyciski{display:flex;flex-wrap:wrap;gap:8px}
+.start h1{font-size:clamp(38px,4vw,54px)}
+.start p{font-size:20px;color:var(--tusz2);margin:12px 0 22px}
+.start-przyciski{display:flex;flex-wrap:wrap;gap:12px}
+
+/* ---------- status wysyłki ---------- */
+.sync{display:inline-flex;align-items:center;gap:10px;font-size:17px;font-weight:600}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--ziel);flex:none}
+.s-kolejka .dot{background:var(--zolty)} .s-blad .dot{background:var(--czer)} .s-demo .dot{background:var(--nieb)}
+
+/* ---------- pasek górny ---------- */
+.bar{flex:none;display:flex;align-items:center;gap:14px;height:68px;padding:0 12px 0 0;background:var(--tusz);color:var(--jasny)}
+.bar .sync{color:#E4E8E3}
+.bar .s-blad{color:#FFB3AE}
+.bar-stan{height:100%;border:0;background:#1E2527;color:#fff;font-family:var(--war);font-weight:700;font-size:32px;padding:0 22px;white-space:nowrap}
+.bar-luz{flex:1}
+.bar-zegar{font-family:var(--war);font-weight:600;font-size:30px;font-variant-numeric:tabular-nums}
+.bar-op{display:flex;flex-direction:column;align-items:flex-end;line-height:1.1;min-width:0}
+.op-imie{font-weight:700;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.op-odl{font-size:14px;color:var(--zolty)}
+.op-odl:empty{display:none}
+.bar #sync{min-width:0;overflow:hidden;flex:0 1 auto}
+.bar .sync{max-width:100%}
+.bar .sync span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar>button,.bar-op{flex:none}
+.bar-btn{height:48px;padding:0 18px;border:2px solid #7F8985;border-radius:8px;background:transparent;color:var(--jasny);font-weight:600;font-size:17px;white-space:nowrap}
+.bar-btn:active{background:#3A4446}
+
+/* ---------- ekran pracy ---------- */
+.praca{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:16px;padding:16px}
+#zlecenia,#wpis{min-height:0;display:flex;flex-direction:column;gap:12px}
+#wpis{position:relative}
+.sekcja-glowa{display:flex;align-items:baseline;gap:10px}
+.sekcja-glowa h2{font-size:28px}
+.sekcja-glowa span{color:var(--tusz2);font-size:17px}
+.kafle{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;align-content:start;padding:3px}
+.kafel{min-height:112px;text-align:left;background:var(--jasny);border:2px solid var(--krawedz);border-bottom-width:5px;border-radius:8px;
+  padding:12px 14px 10px;display:flex;flex-direction:column;gap:2px}
+.kafel:active{transform:translateY(2px);border-bottom-width:3px}
+.kafel-detal{font-family:var(--war);font-weight:700;font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
+.kafel-nazwa{font-size:18px;font-weight:600}
+.kafel-zl{margin-top:auto;font-size:15px;color:var(--tusz2);display:flex;justify-content:space-between;gap:8px}
+.kafel-zl em{font-style:normal;font-weight:700;color:var(--nieb)}
+.kafel.wybrany{background:var(--nieb);border-color:var(--nieb2);color:#fff}
+.kafel.wybrany .kafel-zl,.kafel.wybrany .kafel-zl em{color:#DCE9F5}
+.pusto{flex:1;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:24px;border:2px dashed var(--krawedz2);border-radius:8px}
+.pusto b{font-family:var(--war);font-size:28px}
+.moja-zmiana{flex:none;display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--panel);border-radius:8px;font-size:17px}
+.moja-zmiana .tyt{font-weight:700;line-height:1.15}
+.moja-zmiana .tyt small{display:block;font-weight:500;font-size:15px;color:var(--tusz2)}
+.staty{display:flex;gap:22px;align-items:baseline}
+.moja-zmiana b{font-family:var(--war);font-size:28px;font-variant-numeric:tabular-nums;margin-left:6px}
+
+.wpis-siatka{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:12px}
+.wpis-lewa{min-height:0;display:flex;flex-direction:column;gap:12px}
+.pole{flex:none;background:var(--bialy);border:2px solid var(--krawedz);border-radius:10px;padding:10px 16px 4px;display:flex;flex-direction:column;
+  align-items:stretch;text-align:left;min-height:116px}
+.pole-et{font-weight:700;font-size:19px;display:flex;align-items:center;gap:8px}
+.pole-et i{width:14px;height:14px;border-radius:3px;background:var(--ziel)}
+.pole-nok .pole-et i{background:var(--zolty)}
+.pole-wart{font-family:var(--war);font-weight:700;font-size:72px;line-height:1;text-align:right;font-variant-numeric:tabular-nums}
+.pole-wart.zero{color:#B3B9B5}
+.pole.aktywne{border-color:var(--nieb);box-shadow:inset 0 0 0 3px var(--nieb)}
+.pole-nok.ma{background:var(--zolty-tlo)}
+.przyczyny{flex:1;min-height:0;display:flex;flex-direction:column}
+.przyczyny-et{font-weight:700;font-size:17px;margin-bottom:8px}
+.przyczyny.wyl .przyczyny-et{color:var(--tusz2);font-weight:500}
+.chipy{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:1fr;gap:8px;align-content:start}
+.chipy.dwie{grid-template-columns:1fr 1fr}
+.chip{min-height:52px;padding:6px 12px;border:2px solid var(--krawedz);border-radius:8px;background:var(--jasny);font-weight:600;font-size:16px;line-height:1.15;text-align:left}
+.chip:disabled{opacity:.4}
+.chip.wybrany{background:var(--zolty);border-color:var(--zolty2);color:#1E1A10}
+.numpad{min-height:0;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:10px}
+.klawisz{border:2px solid var(--krawedz);border-bottom-width:6px;border-radius:10px;background:var(--jasny);font-family:var(--war);font-weight:700;
+  font-size:46px;display:flex;align-items:center;justify-content:center;padding:0;min-height:56px}
+.klawisz:active{transform:translateY(3px);border-bottom-width:3px;background:#E3E6E1}
+.klawisz-fn{background:var(--panel);font-size:32px}
+.zapisz{flex:none;min-height:88px;border:0;border-bottom:7px solid var(--ziel2);border-radius:10px;background:var(--ziel);color:#fff;
+  font-family:var(--war);font-weight:700;font-size:38px;padding:0 16px}
+.zapisz:active{transform:translateY(3px);border-bottom-width:4px}
+.zapisz:disabled{background:var(--panel);border-bottom-color:var(--krawedz);color:var(--tusz2);font-size:27px;transform:none}
+
+.potw{position:absolute;inset:0;z-index:5;border-radius:10px;background:var(--ziel);color:#fff;display:flex;flex-direction:column;
+  justify-content:center;gap:12px;padding:32px 40px;animation:pojaw .16s ease-out}
+@keyframes pojaw{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.potw svg{width:88px;height:88px}
+.potw-tytul{font-family:var(--war);font-weight:700;font-size:68px;line-height:1}
+.potw-szcz{font-size:25px;font-weight:600}
+.potw-siec{font-size:18px;color:#D2EDE0}
+.potw-przyciski{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap}
+
+/* ---------- czas pracy ---------- */
+.ev-siatka{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:14px}
+.ev{position:relative;overflow:hidden;border:0;border-bottom:7px solid rgba(0,0,0,.3);border-radius:12px;display:flex;flex-direction:column;
+  justify-content:center;align-items:flex-start;gap:10px;padding:22px 26px;text-align:left;color:#fff;min-height:0}
+.ev svg{width:56px;height:56px;flex:none}
+.ev-nazwa{font-family:var(--war);font-weight:700;font-size:clamp(30px,3.6vw,48px);line-height:1}
+.ev-pod{font-size:19px;font-weight:600;min-height:24px;opacity:.92}
+.ev-START{background:var(--ziel)} .ev-KONIEC{background:var(--tusz)} .ev-PRYW{background:var(--zolty);color:#1E1A10} .ev-SLUZ{background:var(--nieb)}
+.ev:active{transform:translateY(3px);border-bottom-width:4px}
+.ev:disabled{background:var(--panel);color:#959C98;border-bottom-color:var(--krawedz);transform:none}
+.ev.sug,.ev.auto,.ev.wybrany{box-shadow:0 0 0 5px var(--plyta),0 0 0 10px var(--tusz)}
+.ev-pasek{position:absolute;left:0;bottom:0;height:12px;width:0;background:rgba(255,255,255,.8);animation-name:pasek;animation-timing-function:linear;animation-fill-mode:forwards}
+.ev-PRYW .ev-pasek{background:rgba(30,26,16,.55)}
+@keyframes pasek{to{width:100%}}
+.ev-male{grid-auto-rows:auto;gap:12px}
+.ev-male .ev{flex-direction:row;align-items:center;gap:12px;padding:14px 16px;min-height:76px;border-bottom-width:5px}
+.ev-male .ev svg{width:30px;height:30px}
+.ev-male .ev-nazwa{font-size:24px}
+.ev.przygas{opacity:.45}
+.zd-pasek{flex:none;grid-template-columns:repeat(3,1fr);gap:10px}
+.zd-pasek .ev{min-height:64px;padding:10px 12px;gap:10px}
+.zd-pasek .ev svg{width:26px;height:26px}
+.zd-pasek .ev-nazwa{font-size:20px;line-height:1.05}
+.rcp-wybor p{margin:0 0 12px;color:var(--tusz2);font-size:18px}
+.rcp-wybor b{color:var(--tusz)}
+.rcp{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.4fr);gap:24px;padding:20px 20px 20px 28px}
+.rcp-glowa{display:flex;flex-direction:column;justify-content:center;gap:18px;min-width:0}
+.rcp-imie{font-size:clamp(44px,5vw,76px);overflow-wrap:anywhere}
+.rcp-stan{display:flex;align-items:flex-start;gap:14px;font-size:26px;font-weight:700;line-height:1.2}
+.rcp-stan i{width:20px;height:20px;border-radius:50%;margin-top:5px;flex:none;background:var(--krawedz2)}
+.rcp-stan small{display:block;font-size:18px;font-weight:500;color:var(--tusz2);margin-top:6px}
+.st-praca i{background:var(--ziel)} .st-prywatne i{background:var(--zolty)} .st-sluzbowe i{background:var(--nieb)}
+.rcp-pomoc{margin:0;color:var(--tusz2);font-size:18px}
+.rcp-prawa{display:flex;flex-direction:column;gap:14px;min-height:0;padding:6px}
+.rcp-prawa .ev-siatka{flex:1;min-height:0}
+.rcp-prod{width:100%;flex:none}
+.rcp-potw{flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:48px 64px;color:#fff;animation:pojaw .16s ease-out}
+.rcp-potw svg{width:104px;height:104px}
+.rcp-potw-tytul{font-family:var(--war);font-weight:700;font-size:clamp(60px,8vw,128px);line-height:.95}
+.rcp-potw-czas{font-family:var(--war);font-weight:600;font-size:clamp(48px,6vw,96px);line-height:1;font-variant-numeric:tabular-nums}
+.rcp-potw-kto{font-size:32px;font-weight:700;margin-top:8px}
+.rcp-potw-dod{font-size:24px;font-weight:600}
+.rcp-potw .potw-siec{color:inherit;opacity:.85}
+.ev-bg-START{background:var(--ziel)} .ev-bg-KONIEC{background:var(--tusz)} .ev-bg-PRYW{background:var(--zolty);color:#1E1A10} .ev-bg-SLUZ{background:var(--nieb)}
+
+/* ---------- blokada stanowiska ---------- */
+.blokada{flex:1;min-height:0;display:flex;flex-direction:column;gap:18px;padding:24px 40px 22px;color:#fff}
+.blok-gora{display:flex;align-items:baseline;gap:24px;padding-right:110px}
+.blok-stan{font-family:var(--war);font-weight:700;font-size:36px}
+.blok-zegar{font-family:var(--war);font-weight:600;font-size:36px;font-variant-numeric:tabular-nums;opacity:.85}
+.blok-srodek{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:10px}
+.blok-srodek svg{width:92px;height:92px}
+.blok-tytul{font-family:var(--war);font-weight:700;font-size:clamp(56px,7.5vw,120px);line-height:.95}
+.blok-kto{font-family:var(--war);font-weight:700;font-size:clamp(40px,5vw,72px);line-height:1}
+.blok-czas{font-size:28px;font-weight:600;font-variant-numeric:tabular-nums}
+.blok-dol{display:flex;flex-direction:column;gap:12px}
+.blok-info{display:flex;align-items:center;gap:16px;font-size:22px;font-weight:600;padding:16px 20px;border-radius:10px;background:rgba(0,0,0,.2)}
+.blokada.ev-bg-PRYW{color:#1E1A10}
+.ev-bg-PRYW .blok-info{background:rgba(0,0,0,.08)}
+.blok-info svg{width:36px;height:36px;flex:none}
+.blok-kom .komunikat{color:var(--tusz)}
+.blok-przyciski{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.blokada .sync{font-size:16px}
+#admin-btn{position:fixed;z-index:15;top:10px;right:10px;min-height:42px;padding:0 16px;border-radius:8px;border:2px solid var(--tusz);
+  background:var(--jasny);color:var(--tusz);font-weight:700;font-size:15px}
+body.ma-pasek #admin-btn{display:none}
+.baner-zm{flex:none;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 10px 8px 16px;border-radius:8px;
+  background:var(--ziel);color:#fff;font-size:19px;font-weight:600;line-height:1.2;animation:pojaw .16s ease-out}
+.baner-zm .btn{min-height:46px;background:transparent;border-color:#fff;color:#fff;flex:none}
+.adm-kto{color:var(--tusz2);font-size:17px}
+.adm-sek{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--krawedz)}
+.adm-sek h3{margin:0;font-family:var(--war);font-size:24px}
+.adm-sek p{font-size:18px}
+.adm-breloki{display:flex;flex-wrap:wrap;gap:8px}
+.adm-breloki .chip{min-height:48px}
+
+/* ---------- przyciski, okna ---------- */
+.btn{min-height:56px;padding:0 22px;border:2px solid var(--tusz);border-radius:8px;background:var(--bialy);font-weight:600;font-size:18px}
+.btn:active{background:var(--panel)}
+.btn-glowny{background:var(--tusz);color:#fff}
+.btn-glowny:active{background:#3A4446}
+.btn-czer{border-color:var(--czer);color:var(--czer)}
+.btn-duzy{min-height:72px;font-size:22px;padding:0 28px}
+.btn-maly{min-height:44px;padding:0 14px;font-size:16px}
+.btn-na-ziel{background:transparent;border-color:#fff;color:#fff}
+.btn-na-ziel:active{background:var(--ziel2)}
+.btn-bialy{background:#fff;border-color:#fff;color:var(--ziel2)}
+.btn-pelny{background:#fff;border-color:#fff;color:var(--tusz)}
+.btn-obrys{background:transparent;border-color:currentColor;color:inherit}
+.btn-obrys:active{background:rgba(0,0,0,.12)}
+#modal[hidden],#toast[hidden]{display:none}
+.modal-tlo{position:fixed;inset:0;z-index:20;background:rgba(30,37,39,.62)}
+.modal-okno{position:fixed;z-index:21;left:50%;top:50%;transform:translate(-50%,-50%);width:min(780px,94vw);max-height:92vh;max-height:92dvh;overflow:auto;
+  background:var(--jasny);border-radius:12px;border-top:10px solid var(--tusz);padding:22px 28px 24px;display:flex;flex-direction:column;gap:16px}
+.modal-okno.waskie{width:min(440px,94vw)}
+.modal-okno h2{font-size:34px}
+.modal-okno p{margin:0;font-size:20px}
+.modal-dol{display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.f{display:flex;flex-direction:column;gap:6px}
+.f>span{font-weight:600;font-size:16px;color:var(--tusz2)}
+.f input{min-height:52px;border:2px solid var(--krawedz);border-radius:8px;padding:0 12px;background:#fff;color:var(--tusz);font-size:18px;width:100%}
+.f input:focus{border-color:var(--nieb)}
+.f .chipy{display:flex;flex-wrap:wrap}
+.f .chip{min-height:44px}
+.f-check{display:flex;gap:12px;align-items:center;font-weight:600}
+.f-check input{width:28px;height:28px}
+.ust-akcje{display:flex;flex-wrap:wrap;gap:10px}
+.ust-wynik{min-height:24px;font-weight:600}
+.ust-wynik.ok{color:var(--ziel)} .ust-wynik.blad{color:var(--czer)}
+.ust-info{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin:0;font-size:16px}
+.ust-info dt{color:var(--tusz2)} .ust-info dd{margin:0;font-weight:600}
+.hist{display:flex;flex-direction:column}
+.hist-w{display:grid;grid-template-columns:64px minmax(0,1fr) auto auto auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--krawedz)}
+.hist-czas{font-family:var(--war);font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.hist-co b{font-family:var(--war);font-size:22px}
+.hist-co small{display:block;color:var(--tusz2);font-size:15px}
+.hist-il{font-family:var(--war);font-size:22px;font-weight:700;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hist-il .nok{display:block;color:var(--zolty2);font-size:18px}
+.hist-stan{font-size:15px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--panel);white-space:nowrap}
+.st-kolejka .hist-stan{background:var(--zolty-tlo)}
+.st-cofniety{opacity:.55}
+.st-cofniety .hist-co b{text-decoration:line-through}
+.hist-pusto{color:var(--tusz2);padding:12px 0}
+.pin-kropki{display:flex;justify-content:center;gap:16px;min-height:40px}
+.pin-kropki i{width:24px;height:24px;border-radius:50%;border:3px solid var(--tusz)}
+.pin-kropki i.pel{background:var(--tusz)}
+.pin-blad{color:var(--czer);text-align:center;font-weight:700;min-height:24px}
+.numpad-pin{height:330px}
+#toast{position:fixed;z-index:30;left:50%;bottom:28px;transform:translateX(-50%);background:var(--tusz);color:#fff;padding:16px 26px;border-radius:10px;
+  font-size:20px;font-weight:600;max-width:90vw}
+
+/* ---------- pion i małe ekrany ---------- */
+@media (max-aspect-ratio:1/1){
+  .login{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
+  .tabliczka{gap:24px}
+  .tabliczka-stan{font-size:clamp(72px,16vw,170px)}
+  .praca{grid-template-columns:1fr;grid-template-rows:minmax(0,.75fr) minmax(0,1.25fr)}
+  .rcp{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);padding:24px}
+  .rcp-potw{padding:40px}
+  .blokada{padding:24px 28px}
+}
+@media (max-width:1000px){
+  .bar-zegar{display:none}
+}
+@media (max-width:640px){
+  .bar{gap:8px;height:60px}
+  .bar-stan{font-size:24px;padding:0 12px}
+  .bar-zegar,.bar .sync span:last-child{display:none}
+  .wpis-siatka{grid-template-columns:1fr}
+  .pole{min-height:96px}.pole-wart{font-size:54px}
+  .prompt{flex-direction:column;align-items:flex-start}
+  .login{padding:14px}
+  .tabliczka{padding:24px}
+  .ev{padding:14px 16px;gap:6px} .ev svg{width:38px;height:38px} .ev-nazwa{font-size:26px}
+  .rcp-potw{padding:28px}
+}
+@media (prefers-reduced-motion:reduce){
+  .fob .fala{animation:none;opacity:1}
+  .potw,.rcp-potw{animation:none}
+  .ev-pasek{animation:none;width:100%;opacity:.5}
+  .baner-zm{animation:none}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal" hidden></div>
+<div id="toast" role="status" hidden></div>
+<button id="admin-btn" data-a="admin">Admin</button>
+
+<script>
+'use strict';
+const WERSJA = '1.3';
+
+/* ======================= dane demonstracyjne ======================= */
+const DEMO = {
+  pracownicy: [
+    { uid: '1234567', imie: 'Jan Kowalski', nr: '101', aktywny: true },
+    { uid: '7654321', imie: 'Anna Nowak', nr: '102', aktywny: true },
+    { uid: '11223344', imie: 'Piotr Wiśniewski', nr: '103', aktywny: true },
+    { uid: '99887766', imie: 'Marek Zieliński', nr: '104', aktywny: false },
+    { uid: '9999', imie: 'Kierownik Zmiany', nr: '900', aktywny: true, admin: true },
+  ],
+  zlecenia: [
+    { zlecenie: 'ZL/2026/0412', detal: '4410-12', nazwa: 'Wspornik lewy', stanowiska: ['CNC-01', 'CNC-02'] },
+    { zlecenie: 'ZL/2026/0412', detal: '4410-13', nazwa: 'Wspornik prawy', stanowiska: ['CNC-01', 'CNC-02'] },
+    { zlecenie: 'ZL/2026/0418', detal: '7720-03', nazwa: 'Tuleja dystansowa', stanowiska: [] },
+    { zlecenie: 'ZL/2026/0421', detal: '5102-40', nazwa: 'Pokrywa obudowy', stanowiska: ['Prasa-1'] },
+    { zlecenie: 'ZL/2026/0425', detal: '3300-07', nazwa: 'Płyta montażowa', stanowiska: [] },
+    { zlecenie: 'ZL/2026/0430', detal: '8815-21', nazwa: 'Wałek napędowy', stanowiska: [] },
+  ],
+  przyczyny: ['Wymiar poza tolerancją', 'Uszkodzenie powierzchni', 'Wada materiału', 'Ustawianie maszyny', 'Złe narzędzie', 'Inna'],
+  stanowiska: ['CNC-01', 'CNC-02', 'Prasa-1', 'Spawanie-2', 'Montaż-1'],
+  ustawienia: { pinAdmina: '1234', autoWylogowanieS: 60, zmiany: '6,14,22', potwierdzPowyzej: 500, rcpTryb: 'PODPOWIEDZ', rcpAutoS: 3, maxZmianaH: 16, blokadaWyjscie: true, blokadaKoniec: true },
+  obecnosc: [ // Anna jest w pracy od 3 godzin, Piotr od 20 minut na wyjściu prywatnym, Jan jeszcze nie zaczął
+    { uid: '7654321', kod: 'START', czas: new Date(Date.now() - 3.2 * 3600e3).toISOString(), id: 'demo-1' },
+    { uid: '11223344', kod: 'PRYW', czas: new Date(Date.now() - 20 * 60e3).toISOString(), id: 'demo-2' },
+  ],
+};
+const DOMYSLNE = { pinAdmina: '1234', autoWylogowanieS: 60, zmiany: '6,14,22', potwierdzPowyzej: 500, rcpTryb: 'PODPOWIEDZ', rcpAutoS: 3, maxZmianaH: 16,
+  blokadaWyjscie: true, blokadaKoniec: true };
+const TRYBY = [['rcp', 'Czas pracy'], ['produkcja', 'Raport produkcji'], ['oba', 'Czas pracy i raport produkcji']];
+const ZD = ['START', 'KONIEC', 'PRYW', 'SLUZ']; // kolejność przycisków 2×2
+const NAZWA_ZD = { START: 'Początek pracy', KONIEC: 'Koniec pracy', PRYW: 'Wyjście prywatne', SLUZ: 'Wyjście służbowe' };
+const PUSTA = { pracownicy: [], zlecenia: [], przyczyny: [], stanowiska: [], obecnosc: [], ustawienia: DOMYSLNE };
+
+/* ======================= pamięć tabletu ======================= */
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem('rp.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('rp.' + k, JSON.stringify(v)); } catch (e) { /* pamięć niedostępna */ } },
+};
+
+function uuid() {
+  if (window.crypto && crypto.randomUUID) { try { return crypto.randomUUID(); } catch (e) { /* niebezpieczny kontekst */ } }
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+const S = {
+  ust: Object.assign({ api: '', token: '', stanowisko: '', urzadzenie: '', demo: false, tryb: 'rcp' }, LS.get('ust', {})),
+  config: LS.get('config', null),
+  kolejka: LS.get('kolejka', []),
+  log: LS.get('log', []),
+  ostatnie: LS.get('ostatnie', {}),
+  urzadzenieId: LS.get('urzadzenieId', null),
+  ekran: 'login', rcp: null, rcpPotw: null, wybor: null,
+  blokada: LS.get('blokada', null), komBlokady: null, baner: null, oczekujeStart: null, ostatniOdczyt: null, sesjaSymulowana: false, admin: null,
+  rcpLog: LS.get('rcpLog', []), stanLokalny: LS.get('stanLokalny', {}), stanSwiezy: {}, anulowane: new Set(LS.get('anulowane', [])),
+  operator: null, wybrane: null, ok: '', nok: '', pole: 'ok', przyczyna: null,
+  potw: null, komunikat: null, modal: null, modalCb: null, modalNie: null, pin: '',
+  dotyk: Date.now(), taps: [],
+  sync: { trwa: false, blad: null, ostatnio: LS.get('syncOk', null) },
+  wLocie: new Set(), zgloszone: new Set(), timery: {},
+};
+if (!S.ust.trybWybrany) S.ust.tryb = 'oba';
+if (!S.urzadzenieId) { S.urzadzenieId = 'Tablet-' + uuid().slice(0, 4).toUpperCase(); LS.set('urzadzenieId', S.urzadzenieId); }
+
+const zapiszKolejke = () => LS.set('kolejka', S.kolejka);
+const zapiszLog = () => { S.log = S.log.slice(0, 300); LS.set('log', S.log); };
+const zapiszRcp = () => {
+  S.rcpLog = S.rcpLog.slice(0, 300); LS.set('rcpLog', S.rcpLog);
+  LS.set('stanLokalny', S.stanLokalny); LS.set('anulowane', Array.from(S.anulowane).slice(-300));
+};
+
+/* ======================= pomocnicze ======================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const godz = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+const dataTekst = d => d.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+const normUid = v => String(v == null ? '' : v).trim().toUpperCase().replace(/[^0-9A-Z]/g, '').replace(/^0+(?=.)/, '');
+function plural(n, f1, f2, f5) {
+  n = Math.abs(n); if (n === 1) return f1;
+  const d = n % 10, s = n % 100;
+  return d >= 2 && d <= 4 && !(s >= 12 && s <= 14) ? f2 : f5;
+}
+const braki = n => `${n} ${plural(n, 'brak', 'braki', 'braków')}`;
+const cfg = () => (S.ust.demo ? DEMO : (S.config || PUSTA));
+const cu = () => Object.assign({}, DOMYSLNE, cfg().ustawienia || {});
+const stanowisko = () => S.ust.stanowisko || (S.ust.demo ? 'CNC-01' : '');
+const urzadzenie = () => S.ust.urzadzenie || S.urzadzenieId;
+const skonfigurowany = () => S.ust.demo || !!S.ust.api;
+const kluczZl = z => z.zlecenie + '|' + z.detal;
+const tryb = () => S.ust.tryb || 'oba';
+
+function obliczZmiane(d) {
+  const starty = String(cu().zmiany).split(/[,; ]+/).map(Number).filter(n => !isNaN(n) && n >= 0 && n < 24).sort((a, b) => a - b);
+  if (!starty.length) starty.push(0);
+  const h = d.getHours() + d.getMinutes() / 60;
+  let idx = -1;
+  starty.forEach((s, i) => { if (h >= s) idx = i; });
+  let dzien = d;
+  if (idx === -1) { idx = starty.length - 1; dzien = new Date(d.getTime() - 864e5); }
+  return { nr: idx + 1, data: `${dzien.getFullYear()}-${pad(dzien.getMonth() + 1)}-${pad(dzien.getDate())}` };
+}
+
+function widoczneZlecenia() {
+  const st = stanowisko().toLowerCase();
+  return cfg().zlecenia.filter(z => !z.stanowiska || !z.stanowiska.length || z.stanowiska.some(s => s.toLowerCase() === st));
+}
+
+function toast(t) {
+  const el = $('#toast'); el.textContent = t; el.hidden = false;
+  clearTimeout(S.timery.toast); S.timery.toast = setTimeout(() => { el.hidden = true; }, 3200);
+}
+
+/* ======================= ikony ======================= */
+const IKONA_BRELOK = `<svg class="fob" viewBox="0 0 132 132" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <path d="M22 62a20 20 0 0 1 40 0v40a20 20 0 0 1-40 0z"/><circle cx="42" cy="58" r="6"/><circle cx="42" cy="36" r="16"/>
+  <path class="fala" d="M80 64a22 22 0 0 1 0 34"/><path class="fala fala2" d="M94 52a40 40 0 0 1 0 58"/><path class="fala fala3" d="M108 42a56 56 0 0 1 0 78"/></svg>`;
+const IKONA_OK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"/></svg>`;
+const IKONA_COFNIJ_CYFRE = `<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-6-7z"/><path d="M12 9l6 6M18 9l-6 6"/></svg>`;
+
+const IKONY_ZD = {
+  START: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M3 12h11"/><path d="M10 8l4 4-4 4"/>',
+  KONIEC: '<path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M9 12h12"/><path d="M17 8l4 4-4 4"/>',
+  PRYW: '<path d="M3 11l9-7 9 7"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-6h4v6"/>',
+  SLUZ: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
+};
+const IKONA_KLODKA = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><path d="M12 14.5v2.5"/></svg>`;
+const svgZd = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IKONY_ZD[k]}</svg>`;
+
+/* ======================= status wysyłki ======================= */
+function stanSync() {
+  const n = S.kolejka.filter(o => o.type !== 'unknownTag').length;
+  const czeka = n ? `${n} ${plural(n, 'wpis czeka', 'wpisy czekają', 'wpisów czeka')}` : '';
+  if (S.ust.demo) return ['demo', 'Tryb demo: dane zostają na tablecie'];
+  if (!S.ust.api) return ['blad', 'Brak adresu skryptu'];
+  if (S.sync.trwa && n) return ['kolejka', `Wysyłam, ${czeka}`];
+  if (S.sync.blad) return ['blad', czeka ? `${S.sync.blad}. ${czeka}` : S.sync.blad];
+  if (n) return ['kolejka', czeka];
+  return ['ok', 'Wszystko wysłane'];
+}
+function htmlSync() { const [k, t] = stanSync(); return `<span class="sync s-${k}"><i class="dot"></i><span>${esc(t)}</span></span>`; }
+function renderSync() { const el = $('#sync'); if (el) el.innerHTML = htmlSync(); }
+
+/* ======================= ekran logowania ======================= */
+function htmlKomunikat() {
+  const k = S.komunikat; if (!k) return '';
+  if (k.typ === 'nieznany') return `<div class="komunikat"><b>Nieznany brelok</b>
+    <p>Ten brelok nie jest przypisany do pracownika. Kierownik może go dodać w arkuszu Pracownicy.</p><span class="uid">${esc(k.uid)}</span></div>`;
+  if (k.typ === 'nieaktywny') return `<div class="komunikat"><b>Brelok wyłączony</b>
+    <p>${esc(k.imie)} ma oznaczenie „Aktywny: NIE” w arkuszu Pracownicy.</p></div>`;
+  if (k.typ === 'brakListy') return `<div class="komunikat"><b>Brak listy pracowników</b>
+    <p>Tablet nie pobrał jeszcze danych z arkusza. Sprawdź połączenie z siecią i przyłóż brelok ponownie.</p></div>`;
+  if (k.typ === 'wylogowano') return `<div class="komunikat info"><b>Wylogowano</b><p>${esc(k.tekst)}</p></div>`;
+  return '';
+}
+function komunikat(k, ms = 10000) {
+  S.komunikat = k; const el = $('#login-komunikat'); if (el) el.innerHTML = htmlKomunikat();
+  clearTimeout(S.timery.kom);
+  S.timery.kom = setTimeout(() => { S.komunikat = null; const e = $('#login-komunikat'); if (e) e.innerHTML = ''; }, ms);
+}
+
+function htmlLogin() {
+  const st = stanowisko(), teraz = new Date();
+  let srodek;
+  if (!skonfigurowany()) {
+    srodek = `<div class="start"><h1>Tablet nie jest jeszcze skonfigurowany</h1>
+      <p>Wpisz adres skryptu z arkusza Google albo wypróbuj aplikację na przykładowych danych.</p>
+      <div class="start-przyciski"><button class="btn btn-glowny btn-duzy" data-a="ustawienia">Skonfiguruj tablet</button>
+      <button class="btn btn-duzy" data-a="wlaczDemo">Wypróbuj w trybie demo</button></div></div>`;
+  } else {
+    const podpis = { rcp: 'Zapiszesz początek lub koniec pracy albo wyjście.', produkcja: 'Potem wybierzesz zlecenie i wpiszesz ilość.',
+      oba: 'Otworzysz zlecenia i raport. Początek pracy zapisze się sam.' }[tryb()];
+    srodek = `<div class="prompt">${IKONA_BRELOK}<div><h1>Przyłóż brelok do czytnika</h1>
+      <p>${podpis}</p></div></div>`;
+  }
+  const w = S.wybor;
+  const wybor = skonfigurowany() && tryb() === 'rcp' ? `<div class="rcp-wybor">
+      <p>${w ? `Wybrano: <b>${NAZWA_ZD[w.kod]}</b>. Teraz przyłóż brelok.` : 'Możesz też najpierw wybrać zdarzenie, a potem przyłożyć brelok.'}</p>
+      <div class="ev-siatka ev-male">${ZD.map(k => `<button class="ev ev-${k}${w && w.kod === k ? ' wybrany' : ''}${w && w.kod !== k ? ' przygas' : ''}" data-a="wybor" data-v="${k}">${svgZd(k)}<span class="ev-nazwa">${NAZWA_ZD[k]}</span></button>`).join('')}</div>
+    </div>` : '';
+  const demo = S.ust.demo ? `<div class="demo"><p>Tryb demo. Dotknij osoby, żeby zasymulować przyłożenie breloka:</p>
+    <div class="demo-przyciski">${DEMO.pracownicy.map(p => `<button class="btn btn-maly" data-a="brelok" data-v="${esc(p.uid.padStart(10, '0'))}">${esc(p.imie)}${p.admin ? ' (admin)' : ''}</button>`).join('')}
+    <button class="btn btn-maly" data-a="brelok" data-v="0055443322">Nieznany brelok</button></div></div>` : '';
+  return `<div class="login">
+    <button class="tabliczka" data-a="logo" aria-label="Stanowisko ${esc(st)}">
+      <span class="tabliczka-stan">${esc(st || 'Stanowisko')}</span>
+      <span class="tabliczka-dol"><span class="tabliczka-zegar" id="zegar-duzy">${godz(teraz)}</span>
+      <span class="tabliczka-data" id="data-duza">${esc(dataTekst(teraz))}, zmiana ${obliczZmiane(teraz).nr}</span></span>
+    </button>
+    <div class="login-prawa">
+      <div class="login-srodek">${srodek}<div id="login-komunikat">${htmlKomunikat()}</div>${wybor}${demo}</div>
+      <div id="sync">${skonfigurowany() ? htmlSync() : ''}</div>
+    </div></div>`;
+}
+
+/* nazwa stanowiska w jednej linii, możliwie duża */
+function dopasujTabliczke() {
+  const el = $('.tabliczka-stan'); if (!el) return;
+  el.classList.remove('zawijaj'); el.style.fontSize = '';
+  let px = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 1 && px > 56) { px -= 4; el.style.fontSize = px + 'px'; }
+  if (el.scrollWidth > el.clientWidth + 1) el.classList.add('zawijaj');
+}
+window.addEventListener('resize', () => dopasujTabliczke());
+
+/* ======================= ekran pracy ======================= */
+const blokadaAktywna = () => !!S.blokada && tryb() === 'oba';
+function renderAll() {
+  const app = $('#app');
+  const pasek = b => document.body.classList.toggle('ma-pasek', b);
+  if (S.ekran === 'rcp' && S.operator && S.rcp) { app.innerHTML = `<header class="bar" id="bar"></header>${htmlRcp()}`; renderBar(); pasek(true); return; }
+  if (S.ekran === 'rcpPotw' && S.rcpPotw) { app.innerHTML = htmlRcpPotw(); pasek(false); return; }
+  if (S.ekran === 'praca' && S.operator) {
+    app.innerHTML = `<header class="bar" id="bar"></header>
+      <main class="praca"><section id="zlecenia" aria-label="Zlecenia"></section><section id="wpis" aria-label="Ilość"></section></main>`;
+    renderBar(); renderZlecenia(); renderWpis(); pasek(true);
+    return;
+  }
+  S.ekran = 'login'; pasek(false);
+  if (blokadaAktywna()) { app.innerHTML = htmlBlokada(); return; }
+  app.innerHTML = htmlLogin(); dopasujTabliczke();
+}
+
+function renderBar() {
+  const el = $('#bar'); if (!el) return;
+  const rcp = S.ekran === 'rcp';
+  el.innerHTML = `<button class="bar-stan" data-a="logo">${esc(stanowisko() || 'Stanowisko')}</button>
+    <span id="sync">${htmlSync()}</span><span class="bar-luz"></span>
+    ${rcp ? '' : '<button class="bar-btn" data-a="historia">Ostatnie wpisy</button>'}
+    <span class="bar-zegar" id="zegar">${godz(new Date())}</span>
+    ${rcp ? '' : `<span class="bar-op"><span class="op-imie">${esc(S.operator.imie)}</span><span class="op-odl" id="odliczanie"></span></span>`}
+    <button class="bar-btn" data-a="admin">Admin</button>
+    ${rcp ? '<button class="bar-btn" data-a="rcpAnuluj">Anuluj</button>' : '<button class="bar-btn" data-a="wyloguj">Wyloguj</button>'}`;
+}
+
+function podsumowanieZmiany() {
+  const z = obliczZmiane(new Date());
+  let ok = 0, nok = 0, n = 0;
+  S.log.forEach(e => {
+    if (e.uid !== S.operator.uid || e.stan === 'cofniety') return;
+    const ze = obliczZmiane(new Date(e.ts));
+    if (ze.nr === z.nr && ze.data === z.data) { ok += e.ok; nok += e.nok; n++; }
+  });
+  return { ok, nok, n };
+}
+
+function renderZlecenia() {
+  const el = $('#zlecenia'); if (!el) return;
+  const lista = widoczneZlecenia();
+  const ost = S.ostatnie[S.operator.uid];
+  const wyb = S.wybrane ? kluczZl(S.wybrane) : null;
+  const kafle = lista.length ? `<div class="kafle">${lista.map((z, i) => `
+      <button class="kafel${kluczZl(z) === wyb ? ' wybrany' : ''}" data-a="zlecenie" data-v="${i}">
+        <span class="kafel-detal">${esc(z.detal)}</span><span class="kafel-nazwa">${esc(z.nazwa)}</span>
+        <span class="kafel-zl"><span>${esc(z.zlecenie)}</span>${kluczZl(z) === ost ? '<em>ostatnio</em>' : ''}</span>
+      </button>`).join('')}</div>`
+    : `<div class="pusto"><b>Brak zleceń dla stanowiska ${esc(stanowisko())}</b>
+      <span>Dodaj je w arkuszu Zlecenia albo zostaw kolumnę Stanowiska pustą.${S.config || S.ust.demo ? '' : ' Tablet nie pobrał jeszcze danych z arkusza.'}</span></div>`;
+  const p = podsumowanieZmiany();
+  const oba = tryb() === 'oba';
+  const st = oba ? stanPracownika(S.operator.uid) : null;
+  const pasek = oba ? `<div class="ev-siatka ev-male zd-pasek">${['PRYW', 'SLUZ', 'KONIEC'].map(k =>
+    `<button class="ev ev-${k}" data-a="rcpZPracy" data-v="${k}">${svgZd(k)}<span class="ev-nazwa">${NAZWA_ZD[k]}</span></button>`).join('')}</div>` : '';
+  el.innerHTML = `<div class="sekcja-glowa"><h2>Zlecenie</h2><span>${lista.length ? 'dotknij detalu, który robisz' : ''}</span></div>${kafle}
+    ${S.baner ? `<div class="baner-zm" role="status"><span>${esc(S.baner.tekst)}</span>
+      <button class="btn btn-maly" data-a="banerCofnij" data-v="${esc(S.baner.id)}">Cofnij</button></div>`
+    : `<div class="moja-zmiana"><span class="tyt">Twoja zmiana<small>${st && st.klasa === 'praca' ? `w pracy od ${esc(kiedy(st.czas))}` : 'na tym tablecie'}</small></span>
+    <span class="staty"><span>Dobre<b>${p.ok}</b></span><span>Braki<b>${p.nok}</b></span><span>Wpisy<b>${p.n}</b></span></span></div>`}${pasek}`;
+}
+
+function walidacja() {
+  const ok = parseInt(S.ok || '0', 10), nok = parseInt(S.nok || '0', 10);
+  if (!S.wybrane) return { gotowe: false, tekst: 'Najpierw wybierz zlecenie' };
+  if (ok + nok === 0) return { gotowe: false, tekst: 'Wpisz ilość' };
+  if (nok > 0 && cfg().przyczyny.length && !S.przyczyna) return { gotowe: false, tekst: 'Wybierz przyczynę braku' };
+  const t = ok && nok ? `${ok} szt. + ${braki(nok)}` : ok ? `${ok} szt.` : braki(nok);
+  return { gotowe: true, tekst: 'Zapisz ' + t, ok, nok };
+}
+
+function renderWpis() {
+  const el = $('#wpis'); if (!el) return;
+  const nok = parseInt(S.nok || '0', 10);
+  const przyczyny = cfg().przyczyny;
+  const w = walidacja();
+  const wart = v => `<span class="pole-wart${v ? '' : ' zero'}">${esc(v || '0')}</span>`;
+  const sekcjaPrzyczyn = przyczyny.length ? `<div class="przyczyny${nok > 0 ? '' : ' wyl'}">
+      <div class="przyczyny-et">${nok > 0 ? 'Przyczyna braku' : 'Przyczynę wybierzesz, gdy wpiszesz braki'}</div>
+      <div class="chipy${przyczyny.length > 4 ? ' dwie' : ''}">${przyczyny.map((p, i) => `<button class="chip${S.przyczyna === p && nok > 0 ? ' wybrany' : ''}" data-a="przyczyna" data-v="${i}"${nok > 0 ? '' : ' disabled'}>${esc(p)}</button>`).join('')}</div>
+    </div>` : '';
+  el.innerHTML = `<div class="wpis-siatka">
+      <div class="wpis-lewa">
+        <button class="pole${S.pole === 'ok' ? ' aktywne' : ''}" data-a="pole" data-v="ok"><span class="pole-et"><i></i>Dobre</span>${wart(S.ok)}</button>
+        <button class="pole pole-nok${S.pole === 'nok' ? ' aktywne' : ''}${nok > 0 ? ' ma' : ''}" data-a="pole" data-v="nok"><span class="pole-et"><i></i>Braki</span>${wart(S.nok)}</button>
+        ${sekcjaPrzyczyn}
+      </div>
+      <div class="numpad">${['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(k => `<button class="klawisz" data-a="num" data-v="${k}">${k}</button>`).join('')}
+        <button class="klawisz klawisz-fn" data-a="wyczysc" aria-label="Wyczyść pole">C</button>
+        <button class="klawisz" data-a="num" data-v="0">0</button>
+        <button class="klawisz klawisz-fn" data-a="cofnijCyfre" aria-label="Usuń ostatnią cyfrę">${IKONA_COFNIJ_CYFRE}</button>
+      </div>
+    </div>
+    <button class="zapisz" data-a="zapisz"${w.gotowe ? '' : ' disabled'}>${esc(w.tekst)}</button>
+    ${S.potw ? htmlPotw() : ''}`;
+}
+
+function htmlPotw() {
+  const e = S.potw;
+  const szcz = [e.ok ? `${e.ok} szt. dobrych` : '', e.nok ? `${braki(e.nok)} (${e.przyczyna || 'bez przyczyny'})` : ''].filter(Boolean).join(', ');
+  const siec = S.ust.demo ? 'Tryb demo: wpis został tylko na tym tablecie.'
+    : navigator.onLine ? 'Wysyłam do arkusza.' : 'Brak sieci. Wpis czeka w kolejce i wyślę go sam.';
+  return `<div class="potw" role="status">${IKONA_OK}<div class="potw-tytul">Zapisano</div>
+    <div class="potw-szcz">${esc(szcz)}<br>${esc(e.detal)} ${esc(e.nazwa)}, zlecenie ${esc(e.zlecenie)}</div>
+    <div class="potw-siec">${esc(siec)}</div>
+    <div class="potw-przyciski"><button class="btn btn-duzy btn-bialy" data-a="potwDalej">Dalej</button>
+    <button class="btn btn-duzy btn-na-ziel" data-a="cofnijPotw" data-v="${esc(e.id)}">Cofnij wpis</button></div></div>`;
+}
+
+/* ======================= czas pracy ======================= */
+function kiedy(ms) {
+  const d = new Date(ms), t = new Date();
+  const dni = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 864e5);
+  if (dni === 0) return godz(d);
+  if (dni === 1) return 'wczoraj ' + godz(d);
+  return d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' }) + ' ' + godz(d);
+}
+function czasTrwania(ms) {
+  const m = Math.max(0, Math.round(ms / 60000));
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${pad(m % 60)} min`;
+}
+
+/* Stan pracownika = najnowsze z: obecność z arkusza, świeży odczyt z serwera, zdarzenia z tego tabletu. */
+function stanPracownika(uid) {
+  const kandydaci = [];
+  const srv = (cfg().obecnosc || []).find(o => normUid(o.uid) === uid);
+  if (srv && srv.czas && !S.anulowane.has(srv.id)) kandydaci.push({ kod: srv.kod, czas: Date.parse(srv.czas), id: srv.id });
+  const sw = S.stanSwiezy[uid];
+  if (sw && sw.czas && !S.anulowane.has(sw.id)) kandydaci.push(sw);
+  const lok = S.stanLokalny[uid];
+  if (lok && lok.czas) kandydaci.push(lok);
+  const s = kandydaci.sort((a, b) => b.czas - a.czas)[0];
+  if (!s || !s.kod || s.kod === 'KONIEC') return { klasa: 'poza', kod: s ? s.kod : null, czas: s ? s.czas : null };
+  if (Date.now() - s.czas > cu().maxZmianaH * 3600e3) return { klasa: 'poza', kod: s.kod, czas: s.czas, zapomniany: true };
+  return { klasa: { START: 'praca', PRYW: 'prywatne', SLUZ: 'sluzbowe' }[s.kod], kod: s.kod, czas: s.czas };
+}
+function dozwolone(st) {
+  if (cu().rcpTryb === 'RECZNY') return ZD.slice();
+  if (st.klasa === 'poza') return ['START'];
+  if (st.klasa === 'praca') return ['KONIEC', 'PRYW', 'SLUZ'];
+  return ['START', 'KONIEC'];
+}
+const sugerowane = st => (st.klasa === 'praca' ? null : 'START');
+function opisStanu(st) {
+  if (st.klasa === 'praca') return { tytul: `W pracy od ${kiedy(st.czas)}` };
+  if (st.klasa === 'prywatne' || st.klasa === 'sluzbowe') {
+    return { tytul: `Na wyjściu ${st.klasa === 'prywatne' ? 'prywatnym' : 'służbowym'} od ${kiedy(st.czas)}`, pod: 'trwa ' + czasTrwania(Date.now() - st.czas) };
+  }
+  if (st.zapomniany) return { tytul: 'Poza pracą', pod: `Ostatnio: ${NAZWA_ZD[st.kod]}, ${kiedy(st.czas)}. Brakuje końca pracy, zgłoś to przełożonemu.` };
+  return { tytul: 'Poza pracą', pod: st.kod === 'KONIEC' && st.czas ? `Koniec pracy: ${kiedy(st.czas)}` : '' };
+}
+
+function htmlRcp() {
+  const r = S.rcp, st = r.stan, dozw = dozwolone(st), sug = sugerowane(st), op = opisStanu(st);
+  const przyciski = ZD.map(k => {
+    const mozna = dozw.includes(k), auto = r.auto && r.auto.kod === k;
+    let pod = k === 'START' && (st.klasa === 'prywatne' || st.klasa === 'sluzbowe') ? 'powrót z wyjścia' : '';
+    if (auto) pod = `zapiszę za <span id="rcp-odl">${Math.max(1, Math.ceil((r.auto.do - Date.now()) / 1000))}</span> s`;
+    const klasy = (auto ? ' auto' : '') + (!auto && mozna && sug === k && cu().rcpTryb === 'RECZNY' ? ' sug' : '');
+    return `<button class="ev ev-${k}${klasy}" data-a="rcpZdarzenie" data-v="${k}"${mozna ? '' : ' disabled'}>
+      ${svgZd(k)}<span class="ev-nazwa">${NAZWA_ZD[k]}</span><span class="ev-pod">${pod}</span>
+      ${auto ? `<span class="ev-pasek" style="animation-duration:${r.auto.s}s"></span>` : ''}</button>`;
+  }).join('');
+  const prod = tryb() === 'oba' && st.klasa === 'praca' ? '<button class="btn btn-duzy rcp-prod" data-a="doProdukcji">Raport produkcji</button>' : '';
+  return `<main class="rcp">
+    <div class="rcp-glowa"><h1 class="rcp-imie">${esc(S.operator.imie)}</h1>
+      <div class="rcp-stan st-${st.klasa}"><i></i><div>${esc(op.tytul)}${op.pod ? `<small>${esc(op.pod)}</small>` : ''}</div></div>
+      ${r.komunikat ? `<div class="komunikat${r.info ? ' info' : ''}"><p>${esc(r.komunikat)}</p></div>` : ''}
+      <p class="rcp-pomoc">${r.auto ? 'Zapiszę samo. Jeśli to pomyłka, dotknij innego zdarzenia albo Anuluj.' : 'Wybierz zdarzenie.'}</p>
+    </div>
+    <div class="rcp-prawa"><div class="ev-siatka">${przyciski}</div>${prod}</div></main>`;
+}
+
+function htmlRcpPotw() {
+  const e = S.rcpPotw;
+  const dod = e.powrotZ ? `Wyjście ${e.powrotZ === 'prywatne' ? 'prywatne' : 'służbowe'} trwało ${czasTrwania(e.trwanie)}.` : '';
+  const siec = S.ust.demo ? 'Tryb demo: zdarzenie zostało tylko na tym tablecie.'
+    : navigator.onLine ? 'Wysyłam do arkusza.' : 'Brak sieci. Zdarzenie czeka w kolejce i wyślę je sam.';
+  const prod = tryb() === 'oba' && e.zdarzenie === 'START' ? '<button class="btn btn-duzy btn-pelny" data-a="doProdukcji">Raport produkcji</button>' : '';
+  return `<main class="rcp-potw ev-bg-${e.zdarzenie}" role="status">${svgZd(e.zdarzenie)}
+    <div class="rcp-potw-tytul">${NAZWA_ZD[e.zdarzenie]}</div>
+    <div class="rcp-potw-czas">${godz(new Date(e.ts))}</div>
+    <div class="rcp-potw-kto">${esc(e.pracownik)}</div>
+    ${dod ? `<div class="rcp-potw-dod">${esc(dod)}</div>` : ''}
+    <div class="potw-siec">${esc(siec)}</div>
+    <div class="potw-przyciski">${prod}<button class="btn btn-duzy ${prod ? 'btn-obrys' : 'btn-pelny'}" data-a="rcpGotowe">Gotowe</button>
+      <button class="btn btn-duzy btn-obrys" data-a="rcpCofnij" data-v="${esc(e.id)}">Cofnij</button></div></main>`;
+}
+
+function otworzRcp(p) {
+  clearTimeout(S.timery.auto); clearTimeout(S.timery.rcpPotw);
+  const wybor = S.wybor && S.wybor.do > Date.now() ? S.wybor.kod : null;
+  S.wybor = null;
+  S.operator = p; S.wybrane = null; S.ok = ''; S.nok = ''; S.przyczyna = null; S.potw = null; S.rcpPotw = null;
+  S.komunikat = null; S.dotyk = Date.now();
+  const stan = stanPracownika(p.uid);
+  S.rcp = { stan, auto: null, komunikat: null };
+  if (navigator.vibrate) navigator.vibrate(40);
+  if (wybor) {
+    if (dozwolone(stan).includes(wybor)) { rejestruj(wybor); return; }
+    S.rcp.komunikat = `Nie zapisano: ${NAZWA_ZD[wybor]}. Twój stan: ${opisStanu(stan).tytul.toLowerCase()}. Wybierz inne zdarzenie.`;
+  }
+  if (tryb() === 'oba' && stan.klasa === 'praca' && !S.rcp.komunikat) {
+    S.rcp = null; S.ekran = 'praca'; S.zBreloka = Date.now(); renderAll();
+    odswiezStan(p.uid);
+    return;
+  }
+  ustawAuto();
+  S.ekran = 'rcp'; renderAll();
+  odswiezStan(p.uid);
+}
+
+function ustawAuto() {
+  clearTimeout(S.timery.auto);
+  const r = S.rcp; if (!r) return;
+  const d = dozwolone(r.stan), sek = cu().rcpAutoS;
+  r.auto = null;
+  if (cu().rcpTryb !== 'RECZNY' && d.length === 1 && sek > 0 && !r.komunikat) {
+    r.auto = { kod: d[0], do: Date.now() + sek * 1000, s: sek };
+    S.timery.auto = setTimeout(() => { if (S.ekran === 'rcp' && S.rcp && S.rcp.auto) rejestruj(S.rcp.auto.kod); }, sek * 1000);
+  }
+}
+
+/* Świeży stan z arkusza – na wypadek, gdy pracownik odbił się niedawno na innym tablecie. */
+async function odswiezStan(uid) {
+  if (S.ust.demo || !S.ust.api) return;
+  try {
+    const res = await fetchJson(adresApi(S.ust.api, { action: 'stan', token: S.ust.token, uid }), {}, 8000);
+    if (res.ok && res.stan && res.stan.czas) S.stanSwiezy[uid] = { kod: res.stan.kod, czas: Date.parse(res.stan.czas), id: res.stan.id };
+    if (S.ekran === 'rcp' && S.rcp && S.operator && S.operator.uid === uid) {
+      const nowy = stanPracownika(uid);
+      if (nowy.klasa !== S.rcp.stan.klasa || nowy.czas !== S.rcp.stan.czas) { S.rcp.stan = nowy; ustawAuto(); renderAll(); }
+    } else if (S.ekran === 'praca' && tryb() === 'oba' && S.operator && S.operator.uid === uid) {
+      if (S.oczekujeStart) rozstrzygnijStart();
+      else if (stanPracownika(uid).klasa !== 'praca') { // tablet miał nieaktualne dane – pracownik nie był w pracy
+        S.oczekujeStart = { uid, ts: Date.now() }; rozstrzygnijStart();
+      } else renderZlecenia();
+    }
+  } catch (e) { /* zostaje stan z pamięci tabletu */ }
+  if (S.oczekujeStart && S.oczekujeStart.uid === uid) rozstrzygnijStart();
+}
+
+/* Zapisuje zdarzenie czasu pracy zalogowanego pracownika (kolejka + pamięć tabletu). */
+function zapiszZdarzenie(kod, stan, teraz) {
+  const p = S.operator;
+  teraz = teraz || new Date();
+  const powrot = kod === 'START' && (stan.klasa === 'prywatne' || stan.klasa === 'sluzbowe');
+  const uwagi = [];
+  if (powrot) uwagi.push(`powrót z wyjścia ${stan.klasa === 'prywatne' ? 'prywatnego' : 'służbowego'} (${czasTrwania(teraz - stan.czas)})`);
+  else if (stan.zapomniany && kod === 'START') uwagi.push('poprzednio brak końca pracy');
+  if (S.sesjaSymulowana) uwagi.push('zapis przez administratora (symulacja breloka)');
+  const e = {
+    id: uuid(), ts: teraz.toISOString(), uid: p.uid, pracownik: p.imie, nrPracownika: p.nr || '',
+    zdarzenie: kod, stanowisko: stanowisko(), urzadzenie: urzadzenie(), uwagi: uwagi.join(', '),
+  };
+  S.rcpLog.unshift(Object.assign({}, e, { stan: S.ust.demo ? 'demo' : 'kolejka', poprzedni: stan.czas ? { kod: stan.kod, czas: stan.czas } : null }));
+  S.stanLokalny[p.uid] = { kod, czas: teraz.getTime(), id: e.id };
+  zapiszRcp();
+  if (!S.ust.demo) { S.kolejka.push({ opId: uuid(), type: 'rcp', entry: e }); zapiszKolejke(); }
+  if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
+  sync();
+  return Object.assign({}, e, { powrotZ: powrot ? stan.klasa : null, trwanie: powrot ? teraz - stan.czas : 0 });
+}
+
+function rejestruj(kod) {
+  clearTimeout(S.timery.auto);
+  if (!S.operator) return;
+  if (S.oczekujeStart) rozstrzygnijStart();
+  const stan = S.rcp ? S.rcp.stan : stanPracownika(S.operator.uid);
+  const e = zapiszZdarzenie(kod, stan);
+  if (tryb() === 'oba' && kod !== 'START' && (kod === 'KONIEC' ? cu().blokadaKoniec : cu().blokadaWyjscie)) { zablokuj(e); return; }
+  S.rcpPotw = e; S.rcp = null; S.ekran = 'rcpPotw';
+  clearTimeout(S.timery.rcpPotw);
+  S.timery.rcpPotw = setTimeout(() => { if (S.ekran === 'rcpPotw') wyloguj(true); }, 6000);
+  renderAll();
+}
+
+/* ---------- tryb „oba”: brelok od razu otwiera zlecenia i raport ---------- */
+function wejscieDoPracy(p) {
+  clearTimeout(S.timery.auto); clearTimeout(S.timery.rcpPotw); clearTimeout(S.timery.start);
+  S.operator = p; S.wybrane = null; S.ok = ''; S.nok = ''; S.pole = 'ok'; S.przyczyna = null; S.potw = null;
+  S.rcp = null; S.rcpPotw = null; S.komunikat = null; S.wybor = null; S.dotyk = Date.now();
+  S.ekran = 'praca';
+  if (navigator.vibrate) navigator.vibrate(40);
+  const stan = stanPracownika(p.uid);
+  if (stan.klasa === 'praca') { S.oczekujeStart = null; renderAll(); odswiezStan(p.uid); return; }
+  // wg pamięci tabletu pracownik nie jest w pracy: krótko sprawdzamy arkusz, potem zapisujemy początek pracy (albo powrót z wyjścia)
+  S.oczekujeStart = { uid: p.uid, ts: Date.now() };
+  renderAll();
+  if (S.ust.demo || !S.ust.api) { rozstrzygnijStart(); return; }
+  S.timery.start = setTimeout(rozstrzygnijStart, 2500);
+  odswiezStan(p.uid);
+}
+
+function rozstrzygnijStart() {
+  clearTimeout(S.timery.start);
+  const o = S.oczekujeStart; S.oczekujeStart = null;
+  if (!o || !S.operator || S.operator.uid !== o.uid) return;
+  const stan = stanPracownika(o.uid);
+  if (stan.klasa === 'praca') { if (S.ekran === 'praca') renderZlecenia(); return; }
+  const e = zapiszZdarzenie('START', stan, new Date(o.ts));
+  pokazBaner(e.powrotZ ? `Zapisano powrót z wyjścia ${e.powrotZ === 'prywatne' ? 'prywatnego' : 'służbowego'} (${czasTrwania(e.trwanie)})`
+    : `Zapisano: Początek pracy, ${godz(new Date(e.ts))}`, e.id);
+}
+
+/* potwierdzenie początku pracy w miejscu podsumowania zmiany – nie zasłania zleceń ani klawiatury */
+function pokazBaner(tekst, id) { S.baner = { tekst, id, do: Date.now() + 10000 }; if (S.ekran === 'praca') renderZlecenia(); }
+function ukryjBaner() { const byl = !!S.baner; S.baner = null; if (byl && S.ekran === 'praca') renderZlecenia(); }
+
+/* ---------- blokada stanowiska po wyjściu / końcu pracy ---------- */
+function zablokuj(e) {
+  S.blokada = { uid: e.uid, imie: e.pracownik, nr: e.nrPracownika, kod: e.zdarzenie, czas: Date.parse(e.ts), od: Date.now(), id: e.id };
+  LS.set('blokada', S.blokada);
+  ukryjBaner();
+  S.operator = null; S.wybrane = null; S.ok = ''; S.nok = ''; S.przyczyna = null; S.potw = null;
+  S.rcp = null; S.rcpPotw = null; S.komBlokady = null; S.sesjaSymulowana = false; S.ekran = 'login';
+  renderAll();
+}
+function odblokuj() { S.blokada = null; S.komBlokady = null; LS.set('blokada', null); }
+
+function htmlBlokada() {
+  const b = S.blokada, koniec = b.kod === 'KONIEC';
+  const czas = koniec ? `o ${kiedy(b.czas)}` : `od ${kiedy(b.czas)}<span id="blok-trwa">, trwa ${czasTrwania(Date.now() - b.czas)}</span>`;
+  const info = koniec ? `Stanowisko zablokowane po końcu pracy. Odblokować może: ${esc(b.imie)} albo administrator.`
+    : `Stanowisko zablokowane. ${esc(b.imie)}: po powrocie przyłóż swój brelok. Inne osoby: odblokuje administrator.`;
+  const k = S.komBlokady;
+  const kom = !k ? '' : k.typ === 'nieznany' ? `<div class="komunikat"><b>Nieznany brelok</b><span class="uid">${esc(k.uid)}</span></div>`
+    : `<div class="komunikat"><b>${esc(k.imie)}</b><p>${k.typ === 'nieaktywny' ? 'Ten brelok jest wyłączony w arkuszu Pracownicy.'
+      : `To stanowisko jest zablokowane. Odblokować może: ${esc(b.imie)} albo administrator.`}</p></div>`;
+  const cofnij = Date.now() - b.od < 10000 ? '<button class="btn btn-duzy btn-obrys" data-a="cofnijBlokade" id="blok-cofnij">Cofnij</button>' : '';
+  return `<main class="blokada ev-bg-${b.kod}">
+    <div class="blok-gora"><span class="blok-stan">${esc(stanowisko())}</span><span class="blok-zegar" id="zegar-duzy">${godz(new Date())}</span></div>
+    <div class="blok-srodek">${svgZd(b.kod)}<div class="blok-tytul">${NAZWA_ZD[b.kod]}</div>
+      <div class="blok-kto">${esc(b.imie)}</div><div class="blok-czas">${czas}</div></div>
+    <div class="blok-dol"><div class="blok-info">${IKONA_KLODKA}<span>${info}</span></div>
+      <div class="blok-kom" id="blok-kom">${kom}</div>
+      <div class="blok-przyciski">${cofnij}<span id="sync">${htmlSync()}</span></div></div>
+  </main>`;
+}
+
+function obsluzBlokade(kod, uid, p) {
+  const b = S.blokada;
+  if (p && p.aktywny && normUid(b.uid) === uid) {
+    if (Date.now() - b.od < 8000) { toast(`Już zapisano: ${NAZWA_ZD[b.kod]}`); return; } // podwójny odczyt breloka
+    odblokuj();
+    wejscieDoPracy(Object.assign({}, p, { uid }));
+    return;
+  }
+  S.komBlokady = !p ? { typ: 'nieznany', uid: kod } : { typ: p.aktywny ? 'obcy' : 'nieaktywny', imie: p.imie };
+  if (!p) zglosNieznany(kod, uid);
+  renderAll();
+  clearTimeout(S.timery.komBl);
+  S.timery.komBl = setTimeout(() => { S.komBlokady = null; if (blokadaAktywna() && S.ekran === 'login' && !S.modal) renderAll(); }, 6000);
+}
+
+function zglosNieznany(kod, uid) {
+  if (S.ust.demo || S.zgloszone.has(uid)) return;
+  S.zgloszone.add(uid);
+  S.kolejka.push({ opId: uuid(), type: 'unknownTag', uid: kod, stanowisko: stanowisko(), urzadzenie: urzadzenie(), ts: new Date().toISOString() });
+  zapiszKolejke(); sync();
+}
+
+/* ---------- administrator ---------- */
+function logAdmin(akcja, szczegoly) {
+  if (S.ust.demo) return;
+  S.kolejka.push({ opId: uuid(), type: 'admin', kto: S.admin ? S.admin.kto : '', akcja, szczegoly: szczegoly || '',
+    stanowisko: stanowisko(), urzadzenie: urzadzenie(), ts: new Date().toISOString() });
+  zapiszKolejke(); sync();
+}
+
+function brelokAdmina(p) {
+  S.admin = { kto: p.imie, osoba: p };
+  if (S.blokada) {
+    const b = S.blokada;
+    odblokuj();
+    logAdmin('Odblokowanie stanowiska', `${b.imie}: ${NAZWA_ZD[b.kod]} ${kiedy(b.czas)}`);
+    toast('Stanowisko odblokowane');
+    if (S.ekran === 'login') renderAll();
+  }
+  otworzAdmin();
+}
+
+function otworzAdmin() {
+  const a = S.admin || { kto: 'PIN administratora' };
+  const b = S.blokada;
+  const n = S.kolejka.filter(o => o.type !== 'unknownTag').length;
+  const prac = cfg().pracownicy;
+  const odczyt = S.ostatniOdczyt ? `${esc(S.ostatniOdczyt.kod)} (${esc(S.ostatniOdczyt.kto || 'nieznany')}), ${godz(new Date(S.ostatniOdczyt.czas))}` : 'jeszcze żaden';
+  const stanStan = b ? `Zablokowane: <b>${esc(b.imie)}</b>, ${NAZWA_ZD[b.kod].toLowerCase()} ${kiedy(b.czas)}.`
+    : S.operator ? `Zalogowany: <b>${esc(S.operator.imie)}</b>.` : 'Wolne.';
+  modal('admin', `<h2>Administrator</h2><p class="adm-kto">${esc(a.kto)}</p>
+    <div class="adm-sek"><h3>Stanowisko ${esc(stanowisko())}</h3><p>${stanStan}</p>
+      ${b ? '<div><button class="btn btn-glowny" data-a="admOdblokuj">Odblokuj stanowisko</button></div>' : ''}</div>
+    <div class="adm-sek"><h3>Symuluj brelok</h3><p>Działa tak, jak przyłożenie breloka do czytnika. Zdarzenia dostaną uwagę „symulacja breloka”.</p>
+      <div class="adm-breloki">${prac.map(x => `<button class="chip" data-a="admSymuluj" data-v="${esc(String(x.uid).padStart(10, '0'))}">${esc(x.imie)}${x.admin ? ' (admin)' : ''}${x.aktywny ? '' : ' (wyłączony)'}</button>`).join('')}
+        <button class="chip" data-a="admSymuluj" data-v="0055443322">Nieznany brelok</button></div></div>
+    <div class="adm-sek"><h3>Ostatnio odczytany brelok</h3><p id="a-odczyt">${odczyt}</p></div>
+    <div class="adm-sek"><h3>Tablet</h3>
+      <div class="ust-akcje"><button class="btn" data-a="admUstawienia">Ustawienia tabletu</button><button class="btn" data-a="historia">Ostatnie wpisy</button>
+        <button class="btn" data-a="admWyslij">Wyślij kolejkę teraz</button><button class="btn" data-a="admOdswiez">Pobierz dane z arkusza</button>
+        <button class="btn" data-a="admRestart">Uruchom aplikację ponownie</button></div>
+      <div id="u-wynik" class="ust-wynik"></div>
+      <dl class="ust-info"><dt>Tryb</dt><dd>${esc((TRYBY.find(t => t[0] === tryb()) || [])[1] || '')}</dd>
+        <dt>Czeka na wysłanie</dt><dd>${n}</dd><dt>Ostatnia udana wysyłka</dt><dd>${S.sync.ostatnio ? new Date(S.sync.ostatnio).toLocaleString('pl-PL') : 'jeszcze nie'}</dd></dl></div>
+    <div class="modal-dol">${a.osoba ? `<button class="btn" data-a="admJakoPracownik">Zaloguj jako pracownik (${esc(a.osoba.imie)})</button>` : ''}
+      <span class="bar-luz"></span><button class="btn btn-duzy btn-glowny" data-a="admZamknij">Zamknij</button></div>`);
+}
+
+function cofnijRcp(id) {
+  const e = S.rcpLog.find(x => x.id === id);
+  if (!e || e.stan === 'cofniety') return null;
+  const i = S.kolejka.findIndex(o => o.type === 'rcp' && o.entry.id === id);
+  if (i >= 0 && !S.wLocie.has(S.kolejka[i].opId)) S.kolejka.splice(i, 1);
+  else if (!S.ust.demo && e.stan !== 'demo') S.kolejka.push({ opId: uuid(), type: 'cancel', rodzaj: 'rcp', id, kto: e.pracownik, ts: new Date().toISOString() });
+  e.stan = 'cofniety';
+  S.anulowane.add(id);
+  const lok = S.stanLokalny[e.uid];
+  if (lok && lok.id === id) {
+    if (e.poprzedni) S.stanLokalny[e.uid] = Object.assign({}, e.poprzedni, { id: 'przed-' + id });
+    else delete S.stanLokalny[e.uid];
+  }
+  zapiszRcp(); zapiszKolejke(); sync();
+  return e;
+}
+
+/* ======================= logowanie ======================= */
+function obsluzBrelok(kod, symulacja) {
+  const uid = normUid(kod);
+  if (!uid) return;
+  const p = cfg().pracownicy.find(x => normUid(x.uid) === uid);
+  S.ostatniOdczyt = { kod, czas: Date.now(), kto: p ? p.imie : 'nieznany' };
+  const odczyt = $('#a-odczyt'); if (odczyt) odczyt.textContent = `${kod} (${S.ostatniOdczyt.kto}), ${godz(new Date())}`;
+  if (S.modal === 'ust') { const w = $('#u-wynik'); if (w) { w.className = 'ust-wynik'; w.textContent = 'Odczytany brelok: ' + kod; } return; }
+  if (S.modal === 'admin') return; // w panelu admina brelok tylko się wyświetla
+  if (S.modal === 'pin' && !(p && p.admin && p.aktywny)) return;
+  if (S.modal) zamknijModal();
+  if (!skonfigurowany()) return;
+  if (p && p.admin && p.aktywny) { brelokAdmina(Object.assign({}, p, { uid })); return; }
+  S.sesjaSymulowana = !!symulacja; // brelok przyłożony naprawdę kończy „symulowaną” sesję
+  if (blokadaAktywna()) { obsluzBlokade(kod, uid, p); return; }
+  if (!cfg().pracownicy.length) { wyloguj(true); komunikat({ typ: 'brakListy' }); return; }
+  if (!p) {
+    S.wybor = null; wyloguj(true); komunikat({ typ: 'nieznany', uid: kod });
+    zglosNieznany(kod, uid);
+    return;
+  }
+  if (!p.aktywny) { S.wybor = null; wyloguj(true); komunikat({ typ: 'nieaktywny', imie: p.imie }); return; }
+  if (tryb() === 'oba') {
+    if (S.ekran === 'praca' && S.operator && S.operator.uid === uid) { S.dotyk = Date.now(); toast(`Jesteś zalogowany: ${p.imie}`); return; }
+    wejscieDoPracy(Object.assign({}, p, { uid }));
+    return;
+  }
+  if (tryb() !== 'produkcja') {
+    // ten sam brelok odczytany drugi raz (przytrzymany, przyłożony z przyzwyczajenia) nie może zapisać kolejnego zdarzenia
+    if (S.ekran === 'rcpPotw' && S.rcpPotw && normUid(S.rcpPotw.uid) === uid) { toast(`Już zapisano: ${NAZWA_ZD[S.rcpPotw.zdarzenie]}`); return; }
+    if (S.ekran === 'rcp' && S.operator && S.operator.uid === uid) { S.dotyk = Date.now(); return; }
+    if (S.ekran === 'praca' && S.operator && S.operator.uid === uid) { S.dotyk = Date.now(); toast(`Jesteś zalogowany: ${p.imie}`); return; }
+    otworzRcp(Object.assign({}, p, { uid })); return;
+  }
+  if (S.operator && normUid(S.operator.uid) === uid) { S.dotyk = Date.now(); toast(`Jesteś zalogowany: ${p.imie}`); return; }
+  S.operator = Object.assign({}, p, { uid });
+  S.wybrane = null; S.ok = ''; S.nok = ''; S.pole = 'ok'; S.przyczyna = null; S.potw = null;
+  S.komunikat = null; S.dotyk = Date.now(); S.ekran = 'praca';
+  if (navigator.vibrate) navigator.vibrate(40);
+  renderAll();
+}
+
+function wyloguj(cicho, powod) {
+  if (S.oczekujeStart) rozstrzygnijStart();
+  clearTimeout(S.timery.auto); clearTimeout(S.timery.rcpPotw);
+  S.rcp = null; S.rcpPotw = null; S.sesjaSymulowana = false;
+  if (!S.operator) { S.ekran = 'login'; if (!cicho) renderAll(); return; }
+  S.operator = null; S.wybrane = null; S.ok = ''; S.nok = ''; S.przyczyna = null; S.potw = null; S.ekran = 'login';
+  clearTimeout(S.timery.potw);
+  if (S.modal && S.modal !== 'ust' && S.modal !== 'pin' && S.modal !== 'admin') zamknijModal();
+  renderAll();
+  if (powod) komunikat({ typ: 'wylogowano', tekst: powod }, 6000);
+}
+
+/* ======================= zapis wpisu ======================= */
+function zapiszWpis(potwierdzone) {
+  const w = walidacja(); if (!w.gotowe) return;
+  const limit = cu().potwierdzPowyzej;
+  if (!potwierdzone && w.ok + w.nok > limit) {
+    pytaj('Sprawdź ilość', `Wpisano <b>${w.ok + w.nok} szt.</b> To więcej niż zwykle (${limit}). Czy ilość jest poprawna?`,
+      'Tak, zapisz', () => zapiszWpis(true), 'Popraw');
+    return;
+  }
+  const z = S.wybrane;
+  const e = {
+    id: uuid(), ts: new Date().toISOString(), stanowisko: stanowisko(), urzadzenie: urzadzenie(),
+    uid: S.operator.uid, pracownik: S.operator.imie, nrPracownika: S.operator.nr || '',
+    zlecenie: z.zlecenie, detal: z.detal, nazwa: z.nazwa, ok: w.ok, nok: w.nok, przyczyna: w.nok > 0 ? (S.przyczyna || '') : '',
+  };
+  S.log.unshift(Object.assign({}, e, { stan: S.ust.demo ? 'demo' : 'kolejka' }));
+  zapiszLog();
+  if (!S.ust.demo) { S.kolejka.push({ opId: uuid(), type: 'report', entry: e }); zapiszKolejke(); }
+  S.ostatnie[S.operator.uid] = kluczZl(z); LS.set('ostatnie', S.ostatnie);
+  S.ok = ''; S.nok = ''; S.przyczyna = null; S.pole = 'ok';
+  S.potw = e;
+  if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
+  clearTimeout(S.timery.potw);
+  S.timery.potw = setTimeout(() => { S.potw = null; renderWpis(); }, 6000);
+  renderZlecenia(); renderWpis(); renderSync();
+  sync();
+}
+
+function cofnijWpis(id) {
+  const e = S.log.find(x => x.id === id);
+  if (!e || e.stan === 'cofniety') return null;
+  const i = S.kolejka.findIndex(o => o.type === 'report' && o.entry.id === id);
+  if (i >= 0 && !S.wLocie.has(S.kolejka[i].opId)) {
+    S.kolejka.splice(i, 1); // jeszcze nie wysłany – wystarczy usunąć z kolejki
+  } else if (!S.ust.demo && e.stan !== 'demo') {
+    S.kolejka.push({ opId: uuid(), type: 'cancel', rodzaj: 'raport', id, kto: S.operator ? S.operator.imie : '', ts: new Date().toISOString() });
+  }
+  e.stan = 'cofniety';
+  zapiszKolejke(); zapiszLog(); sync();
+  return e;
+}
+
+/* ======================= wysyłka do arkusza ======================= */
+async function fetchJson(url, opcje, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms || 20000);
+  try {
+    let r;
+    try { r = await fetch(url, Object.assign({ redirect: 'follow', signal: ctrl.signal, cache: 'no-store' }, opcje || {})); }
+    catch (e) { throw new Error(e.name === 'AbortError' ? 'Serwer nie odpowiada' : 'Brak połączenia'); }
+    const txt = await r.text();
+    try { return JSON.parse(txt); }
+    catch (e) { throw new Error(r.ok ? 'Nieoczekiwana odpowiedź serwera (sprawdź dostęp „Każdy” we wdrożeniu)' : `Błąd serwera ${r.status}`); }
+  } finally { clearTimeout(t); }
+}
+const adresApi = (api, params) => api + (api.includes('?') ? '&' : '?') + new URLSearchParams(params).toString();
+
+async function sync() {
+  if (S.ust.demo || !S.ust.api || S.sync.trwa) return;
+  if (!S.kolejka.length) { if (!S.sync.blad) renderSync(); return; }
+  const paczka = S.kolejka.slice(0, 40);
+  S.sync.trwa = true; S.wLocie = new Set(paczka.map(o => o.opId)); renderSync();
+  let dalej = false;
+  try {
+    const res = await fetchJson(S.ust.api, { method: 'POST', body: JSON.stringify({ token: S.ust.token, urzadzenie: urzadzenie(), ops: paczka }) }, 30000);
+    if (!res.ok) throw new Error(res.error || 'Serwer odrzucił dane');
+    const done = new Set(res.done || []);
+    S.kolejka = S.kolejka.filter(o => !done.has(o.opId));
+    paczka.forEach(o => {
+      if (!done.has(o.opId) || !o.entry) return;
+      const l = (o.type === 'rcp' ? S.rcpLog : o.type === 'report' ? S.log : []).find(x => x.id === o.entry.id);
+      if (l && l.stan === 'kolejka') l.stan = 'wyslany';
+    });
+    zapiszKolejke(); zapiszLog(); zapiszRcp();
+    S.sync.blad = null; S.sync.ostatnio = Date.now(); LS.set('syncOk', S.sync.ostatnio);
+    dalej = S.kolejka.length > 0 && done.size > 0;
+  } catch (e) {
+    S.sync.blad = e.message;
+  } finally {
+    S.sync.trwa = false; S.wLocie = new Set();
+    renderSync();
+    if (S.modal === 'hist') otworzHistorie();
+  }
+  if (dalej) setTimeout(sync, 300);
+}
+
+async function pobierzKonfiguracje(api, token) {
+  api = api || S.ust.api; token = token == null ? S.ust.token : token;
+  if (S.ust.demo || !api) return { ok: false, error: 'Brak adresu' };
+  try {
+    const res = await fetchJson(adresApi(api, { action: 'config', token }), {}, 25000);
+    if (!res.ok) throw new Error(res.error || 'Błąd');
+    if (api === S.ust.api) {
+      S.config = res.config; S.config.pobranoLokalnie = Date.now(); LS.set('config', S.config);
+      if (!S.kolejka.length) S.sync.blad = null;
+      if (S.ekran === 'praca') { renderZlecenia(); renderWpis(); renderSync(); }
+      else if (S.ekran === 'login' && !S.modal) renderAll(); else renderSync();
+    }
+    return { ok: true, config: res.config };
+  } catch (e) {
+    if (api === S.ust.api && !S.kolejka.length) { S.sync.blad = e.message; renderSync(); }
+    return { ok: false, error: e.message };
+  }
+}
+
+/* ======================= okna ======================= */
+function modal(nazwa, html, klasa) {
+  S.modal = nazwa;
+  const m = $('#modal');
+  m.innerHTML = `<div class="modal-tlo"${nazwa === 'hist' ? ' data-a="zamknijModal"' : ''}></div><div class="modal-okno ${klasa || ''}" role="dialog" aria-modal="true">${html}</div>`;
+  m.hidden = false;
+}
+function zamknijModal() { S.modal = null; S.modalCb = null; S.modalNie = null; const m = $('#modal'); m.hidden = true; m.innerHTML = ''; }
+
+function pytaj(tytul, trescHtml, takTekst, onTak, nieTekst, onNie, niebezpieczne) {
+  modal('pytaj', `<h2>${esc(tytul)}</h2><p>${trescHtml}</p>
+    <div class="modal-dol"><button class="btn btn-duzy" data-a="modalNie">${esc(nieTekst || 'Anuluj')}</button>
+    <button class="btn btn-duzy ${niebezpieczne ? 'btn-czer' : 'btn-glowny'}" data-a="modalTak">${esc(takTekst)}</button></div>`, 'waskie');
+  S.modalCb = onTak; S.modalNie = onNie || null;
+}
+
+function otworzHistorie() {
+  const teraz = Date.now();
+  const etyk = { kolejka: 'Czeka', wyslany: 'Wysłany', cofniety: 'Cofnięty', demo: 'Demo' };
+  const lista = S.log.map(e => Object.assign({ typ: 'raport' }, e)).concat(S.rcpLog.map(e => Object.assign({ typ: 'rcp' }, e)))
+    .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts)).slice(0, 40);
+  const wiersze = lista.map(e => {
+    const d = new Date(e.ts);
+    if (e.typ === 'rcp') {
+      return `<div class="hist-w st-${e.stan}"><span class="hist-czas">${godz(d)}</span>
+        <span class="hist-co"><b>${esc(NAZWA_ZD[e.zdarzenie] || e.zdarzenie)}</b><small>${esc(e.pracownik)}${e.uwagi ? ', ' + esc(e.uwagi) : ''}</small></span>
+        <span class="hist-il"></span><span class="hist-stan">${etyk[e.stan] || e.stan}</span><span></span></div>`;
+    }
+    const mozna = e.stan !== 'cofniety' && S.operator && e.uid === S.operator.uid && teraz - d.getTime() < 15 * 60 * 1000;
+    return `<div class="hist-w st-${e.stan}"><span class="hist-czas">${godz(d)}</span>
+      <span class="hist-co"><b>${esc(e.detal)}</b> ${esc(e.nazwa)}<small>${esc(e.zlecenie)}, ${esc(e.pracownik)}</small></span>
+      <span class="hist-il">${e.ok} szt.${e.nok ? `<span class="nok">${esc(braki(e.nok))}</span>` : ''}</span>
+      <span class="hist-stan">${etyk[e.stan] || e.stan}</span>
+      <span>${mozna ? `<button class="btn btn-maly" data-a="cofnijHist" data-v="${esc(e.id)}">Cofnij</button>` : ''}</span></div>`;
+  }).join('');
+  modal('hist', `<h2>Ostatnie wpisy i zdarzenia na tym tablecie</h2>
+    <div class="hist">${wiersze || '<div class="hist-pusto">Na tym tablecie nie ma jeszcze wpisów.</div>'}</div>
+    <p style="font-size:16px;color:var(--tusz2)">Swój wpis możesz cofnąć do 15 minut po zapisaniu.</p>
+    <div class="modal-dol"><button class="btn btn-duzy btn-glowny" data-a="zamknijModal">Zamknij</button></div>`);
+}
+
+function otworzPin() {
+  S.pin = '';
+  modal('pin', `<h2>PIN administratora</h2><div class="pin-kropki" id="pin-kropki"></div><div class="pin-blad" id="pin-blad"></div>
+    <div class="numpad numpad-pin">${['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(k => `<button class="klawisz" data-a="pinNum" data-v="${k}">${k}</button>`).join('')}
+    <button class="klawisz klawisz-fn" data-a="zamknijModal" aria-label="Zamknij">✕</button>
+    <button class="klawisz" data-a="pinNum" data-v="0">0</button>
+    <button class="klawisz klawisz-fn" data-a="pinCofnij" aria-label="Usuń cyfrę">${IKONA_COFNIJ_CYFRE}</button></div>`, 'waskie');
+  renderPin();
+}
+function renderPin(blad) {
+  const n = Math.max(4, String(cu().pinAdmina).length);
+  const k = $('#pin-kropki'); if (k) k.innerHTML = Array.from({ length: n }, (_, i) => `<i class="${i < S.pin.length ? 'pel' : ''}"></i>`).join('');
+  const b = $('#pin-blad'); if (b) b.textContent = blad || '';
+}
+
+function linkKonfiguracji(u) {
+  if (!u.api) return '';
+  const p = new URLSearchParams({ api: u.api, token: u.token });
+  if (u.stanowisko) p.set('stanowisko', u.stanowisko);
+  if (u.tryb) p.set('tryb', u.tryb);
+  return location.origin + location.pathname + '?' + p.toString();
+}
+
+function otworzUstawienia() {
+  const u = S.ust, c = cfg();
+  const n = S.kolejka.filter(o => o.type !== 'unknownTag').length;
+  const kiedy = t => t ? new Date(t).toLocaleString('pl-PL') : 'jeszcze nie';
+  const stany = (S.config ? S.config.stanowiska : DEMO.stanowiska) || [];
+  modal('ust', `<h2>Ustawienia tabletu</h2>
+    <label class="f"><span>Adres skryptu (adres wdrożenia, kończy się na /exec)</span>
+      <input id="u-api" type="url" value="${esc(u.api)}" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false"></label>
+    <label class="f"><span>Token API (arkusz Ustawienia, wiersz TOKEN)</span>
+      <input id="u-token" value="${esc(u.token)}" autocomplete="off" spellcheck="false"></label>
+    <div class="f"><span>Stanowisko, przy którym wisi ten tablet</span>
+      <input id="u-stan" value="${esc(u.stanowisko)}" placeholder="np. CNC-01" autocomplete="off">
+      ${stany.length ? `<div class="chipy">${stany.map(s => `<button class="chip" data-a="ustStan" data-v="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : ''}</div>
+    <div class="f"><span>Co robi ten tablet</span>
+      <div class="chipy" id="u-tryb">${TRYBY.map(([v, t]) => `<button class="chip${tryb() === v ? ' wybrany' : ''}" data-a="ustTryb" data-v="${v}">${t}</button>`).join('')}</div></div>
+    <label class="f"><span>Nazwa tabletu (opcjonalnie, trafia do kolumny Urządzenie)</span>
+      <input id="u-urz" value="${esc(u.urzadzenie)}" placeholder="${esc(S.urzadzenieId)}" autocomplete="off"></label>
+    <label class="f-check"><input type="checkbox" id="u-demo"${u.demo ? ' checked' : ''}> Tryb demo: przykładowe dane, nic nie jest wysyłane</label>
+    <div class="ust-akcje"><button class="btn" data-a="ustTest">Sprawdź połączenie</button>
+      <button class="btn" data-a="ustWyslij">Wyślij kolejkę teraz</button></div>
+    <div id="u-wynik" class="ust-wynik"></div>
+    <dl class="ust-info"><dt>Czeka na wysłanie</dt><dd>${n}</dd>
+      <dt>Ostatnia udana wysyłka</dt><dd>${kiedy(S.sync.ostatnio)}</dd>
+      <dt>Dane z arkusza</dt><dd>${S.config ? `${kiedy(S.config.pobranoLokalnie)}: ${c.pracownicy.length} pracowników, ${c.zlecenia.length} zleceń` : 'jeszcze nie pobrane'}</dd>
+      <dt>Wersja aplikacji</dt><dd>${WERSJA}</dd></dl>
+    ${u.api ? `<label class="f"><span>Link do skonfigurowania kolejnego tabletu (bez stanowiska zmień je na miejscu)</span>
+      <input readonly value="${esc(linkKonfiguracji(u))}"></label>` : ''}
+    <div class="modal-dol"><button class="btn btn-czer" data-a="ustWyczysc">Usuń niewysłane wpisy</button><span class="bar-luz"></span>
+      <button class="btn" data-a="zamknijModal">Anuluj</button><button class="btn btn-glowny" data-a="ustZapisz">Zapisz ustawienia</button></div>`);
+}
+function czytajFormularz() {
+  const v = id => ($('#' + id) ? $('#' + id).value.trim() : '');
+  const t = document.querySelector('#u-tryb .chip.wybrany');
+  return { api: v('u-api'), token: v('u-token'), stanowisko: v('u-stan'), urzadzenie: v('u-urz'), demo: !!($('#u-demo') && $('#u-demo').checked),
+    tryb: t ? t.dataset.v : tryb(), trybWybrany: true };
+}
+function wynikUst(tekst, klasa) { const w = $('#u-wynik'); if (w) { w.className = 'ust-wynik ' + (klasa || ''); w.textContent = tekst; } }
+
+/* ======================= akcje przycisków ======================= */
+const AKCJE = {
+  logo() {
+    const t = Date.now(); S.taps = S.taps.filter(x => t - x < 3000); S.taps.push(t);
+    if (S.taps.length >= 5) { S.taps = []; AKCJE.admin(); }
+  },
+  admin() {
+    if (S.modal === 'admin') return;
+    if (!skonfigurowany()) { otworzUstawienia(); return; }
+    S.admin = null; otworzPin();
+  },
+  admZamknij() { zamknijModal(); S.admin = null; S.dotyk = Date.now(); },
+  admOdblokuj() {
+    const b = S.blokada; if (!b) return;
+    odblokuj();
+    logAdmin('Odblokowanie stanowiska', `${b.imie}: ${NAZWA_ZD[b.kod]} ${kiedy(b.czas)}`);
+    if (S.ekran === 'login') renderAll();
+    otworzAdmin(); wynikUst('Stanowisko odblokowane.', 'ok');
+  },
+  admSymuluj(v) {
+    const p = cfg().pracownicy.find(x => normUid(x.uid) === normUid(v));
+    const adm = S.admin;
+    zamknijModal();
+    if (!(p && p.admin)) logAdmin('Symulacja breloka', p ? p.imie : v);
+    S.admin = adm;
+    obsluzBrelok(v, true);
+  },
+  admUstawienia() { otworzUstawienia(); },
+  admWyslij() { wynikUst('Wysyłam…'); S.sync.blad = null; sync().then(() => wynikUst(S.sync.blad ? 'Nie wysłano: ' + S.sync.blad : 'Kolejka wysłana.', S.sync.blad ? 'blad' : 'ok')); },
+  async admOdswiez() { wynikUst('Pobieram…'); const r = await pobierzKonfiguracje(); wynikUst(r.ok ? 'Dane z arkusza pobrane.' : 'Nie udało się: ' + r.error, r.ok ? 'ok' : 'blad'); },
+  admRestart() { location.reload(); },
+  admJakoPracownik() {
+    const a = S.admin; if (!a || !a.osoba) return;
+    zamknijModal(); S.admin = null;
+    if (blokadaAktywna()) return;
+    if (tryb() === 'oba') wejscieDoPracy(a.osoba); else if (tryb() === 'rcp') otworzRcp(a.osoba);
+    else { S.operator = a.osoba; S.ekran = 'praca'; S.dotyk = Date.now(); renderAll(); }
+  },
+  cofnijBlokade() {
+    const b = S.blokada; if (!b || Date.now() - b.od > 15000) return;
+    cofnijRcp(b.id);
+    odblokuj();
+    const p = cfg().pracownicy.find(x => normUid(x.uid) === normUid(b.uid));
+    toast(`Cofnięto: ${NAZWA_ZD[b.kod]}`);
+    if (p) wejscieDoPracy(Object.assign({}, p, { uid: normUid(b.uid) })); else renderAll();
+  },
+  banerCofnij(id) {
+    const e = cofnijRcp(id);
+    ukryjBaner();
+    if (!e) return;
+    toast(`Cofnięto: ${NAZWA_ZD[e.zdarzenie]}`);
+    if (S.operator && S.operator.uid === e.uid) wyloguj(true);
+  },
+  ustawienia() { if (!skonfigurowany()) otworzUstawienia(); },
+  wlaczDemo() { S.ust.demo = true; LS.set('ust', S.ust); renderAll(); },
+  brelok(v) { obsluzBrelok(v); },
+  wybor(v) { S.wybor = S.wybor && S.wybor.kod === v ? null : { kod: v, do: Date.now() + 15000 }; renderAll(); },
+  rcpZdarzenie(v) { if (S.rcp && dozwolone(S.rcp.stan).includes(v)) rejestruj(v); },
+  rcpAnuluj() { wyloguj(true); },
+  rcpGotowe() { wyloguj(true); },
+  rcpCofnij(id) {
+    clearTimeout(S.timery.rcpPotw);
+    const e = cofnijRcp(id);
+    if (!e || !S.operator) { wyloguj(true); return; }
+    S.rcpPotw = null;
+    S.rcp = { stan: stanPracownika(S.operator.uid), auto: null, info: true,
+      komunikat: `Cofnięto: ${NAZWA_ZD[e.zdarzenie]}. Wybierz właściwe zdarzenie albo naciśnij Anuluj.` };
+    S.ekran = 'rcp'; S.dotyk = Date.now(); renderAll();
+  },
+  doProdukcji() {
+    clearTimeout(S.timery.auto); clearTimeout(S.timery.rcpPotw);
+    S.rcp = null; S.rcpPotw = null; S.ekran = 'praca'; S.dotyk = Date.now(); renderAll();
+  },
+  doRcp() {
+    if (!S.operator) return;
+    S.rcp = { stan: stanPracownika(S.operator.uid), auto: null, komunikat: null };
+    ustawAuto(); S.ekran = 'rcp'; S.dotyk = Date.now(); renderAll(); odswiezStan(S.operator.uid);
+  },
+  rcpZPracy(v) {
+    if (!S.operator) return;
+    if (S.oczekujeStart) rozstrzygnijStart();
+    const wykonaj = () => {
+      S.rcp = { stan: stanPracownika(S.operator.uid), auto: null, komunikat: null };
+      if (!dozwolone(S.rcp.stan).includes(v)) {
+        S.rcp.komunikat = `Nie zapisano: ${NAZWA_ZD[v]}. Twój stan: ${opisStanu(S.rcp.stan).tytul.toLowerCase()}.`;
+        S.ekran = 'rcp'; renderAll(); return;
+      }
+      rejestruj(v);
+    };
+    if (S.ok || S.nok) {
+      pytaj('Raport nie jest zapisany', `Wpisana ilość nie została zapisana. Zapisać <b>${esc(NAZWA_ZD[v].toLowerCase())}</b> bez raportu?`,
+        `${NAZWA_ZD[v]} bez raportu`, wykonaj, 'Wróć do raportu', null, true);
+      return;
+    }
+    wykonaj();
+  },
+  ustTryb(v) { document.querySelectorAll('#u-tryb .chip').forEach(c => c.classList.toggle('wybrany', c.dataset.v === v)); },
+  wyloguj() { wyloguj(); },
+  historia() { otworzHistorie(); },
+  zlecenie(v) { S.wybrane = widoczneZlecenia()[+v] || null; renderZlecenia(); renderWpis(); },
+  pole(v) { S.pole = v; renderWpis(); },
+  num(v) {
+    const k = S.pole; let s = S[k];
+    if (s.length >= 5) return;
+    S[k] = (s === '0' ? '' : s) + v;
+    if (S[k] === '0') S[k] = '';
+    renderWpis();
+  },
+  cofnijCyfre() { S[S.pole] = S[S.pole].slice(0, -1); renderWpis(); },
+  wyczysc() { S[S.pole] = ''; renderWpis(); },
+  przyczyna(v) { S.przyczyna = cfg().przyczyny[+v] || null; renderWpis(); },
+  zapisz() { zapiszWpis(false); },
+  potwDalej() { clearTimeout(S.timery.potw); S.potw = null; renderWpis(); },
+  cofnijPotw(id) {
+    clearTimeout(S.timery.potw);
+    const e = cofnijWpis(id);
+    S.potw = null;
+    if (e) { // przywróć dane, żeby można było poprawić i zapisać jeszcze raz
+      S.ok = e.ok ? String(e.ok) : ''; S.nok = e.nok ? String(e.nok) : ''; S.przyczyna = e.przyczyna || null;
+      S.wybrane = cfg().zlecenia.find(z => kluczZl(z) === kluczZl(e)) || S.wybrane;
+      toast('Wpis cofnięty. Możesz poprawić ilość i zapisać ponownie.');
+    }
+    renderZlecenia(); renderWpis(); renderSync();
+  },
+  cofnijHist(id) {
+    const e = S.log.find(x => x.id === id); if (!e) return;
+    pytaj('Cofnąć wpis?', `${esc(e.detal)} ${esc(e.nazwa)}: <b>${e.ok} szt.</b>${e.nok ? `, ${esc(braki(e.nok))}` : ''}, zapisany o ${godz(new Date(e.ts))}.`,
+      'Cofnij wpis', () => { cofnijWpis(id); renderZlecenia(); toast('Wpis cofnięty'); otworzHistorie(); }, 'Zostaw', () => otworzHistorie(), true);
+  },
+  zamknijModal() { zamknijModal(); },
+  modalTak() { const cb = S.modalCb; zamknijModal(); if (cb) cb(); },
+  modalNie() { const cb = S.modalNie; zamknijModal(); if (cb) cb(); },
+  pinNum(v) {
+    const pin = String(cu().pinAdmina);
+    if (S.pin.length >= Math.max(4, pin.length)) return;
+    S.pin += v; renderPin();
+    if (S.pin === pin) { S.pin = ''; S.admin = { kto: 'PIN administratora' }; otworzAdmin(); return; }
+    if (S.pin.length >= pin.length) { setTimeout(() => { S.pin = ''; renderPin('Zły PIN'); }, 150); }
+  },
+  pinCofnij() { S.pin = S.pin.slice(0, -1); renderPin(); },
+  ustStan(v) { const i = $('#u-stan'); if (i) i.value = v; },
+  async ustTest() {
+    const f = czytajFormularz();
+    if (f.demo) { wynikUst('W trybie demo tablet nie łączy się z arkuszem.'); return; }
+    if (!f.api) { wynikUst('Wpisz adres skryptu.', 'blad'); return; }
+    wynikUst('Sprawdzam…');
+    try {
+      const r = await fetchJson(adresApi(f.api, { action: 'ping', token: f.token }), {}, 20000);
+      if (!r.ok) throw new Error(r.error || 'Błąd');
+      const c = await pobierzKonfiguracje(f.api, f.token);
+      wynikUst(`Połączono z arkuszem „${r.arkusz}”.` + (c.ok ? ` Pracownicy: ${c.config.pracownicy.length}, zlecenia: ${c.config.zlecenia.length}.` : ''), 'ok');
+    } catch (e) { wynikUst('Nie udało się połączyć: ' + e.message, 'blad'); }
+  },
+  ustWyslij() { wynikUst('Wysyłam…'); S.sync.blad = null; sync().then(() => wynikUst(S.sync.blad ? 'Nie wysłano: ' + S.sync.blad : 'Kolejka wysłana.', S.sync.blad ? 'blad' : 'ok')); },
+  ustWyczysc() {
+    const n = S.kolejka.filter(o => o.type !== 'unknownTag').length;
+    pytaj('Usunąć niewysłane wpisy?', `Z tabletu zostanie usuniętych <b>${n}</b> ${plural(n, 'wpis', 'wpisy', 'wpisów')}, które nie dotarły do arkusza. Tego nie da się cofnąć.`,
+      'Usuń wpisy', () => { S.kolejka = []; zapiszKolejke(); S.sync.blad = null; renderSync(); otworzUstawienia(); wynikUst('Kolejka wyczyszczona.', 'ok'); },
+      'Zostaw', () => otworzUstawienia(), true);
+  },
+  ustZapisz() {
+    const f = czytajFormularz();
+    if (!f.demo && !f.api) { wynikUst('Wpisz adres skryptu albo włącz tryb demo.', 'blad'); return; }
+    if (!f.demo && !f.stanowisko) { wynikUst('Wpisz nazwę stanowiska.', 'blad'); return; }
+    const zmianaApi = f.api !== S.ust.api;
+    S.ust = Object.assign(S.ust, f); LS.set('ust', S.ust);
+    if (zmianaApi) { S.config = null; LS.set('config', null); }
+    S.sync.blad = null;
+    zamknijModal(); wyloguj(true); renderAll();
+    pobierzKonfiguracje(); sync();
+    toast('Ustawienia zapisane');
+  },
+};
+
+/* ======================= zdarzenia ======================= */
+document.addEventListener('click', ev => {
+  const el = ev.target.closest('[data-a]');
+  if (!el || el.disabled) return;
+  const fn = AKCJE[el.dataset.a];
+  if (fn) fn(el.dataset.v, el);
+  if (el.blur) el.blur();
+});
+document.addEventListener('pointerdown', () => { S.dotyk = Date.now(); trzymajEkran(); }, true);
+document.addEventListener('contextmenu', ev => { if (!ev.target.closest('input')) ev.preventDefault(); });
+
+/* Czytnik RFID USB działa jak klawiatura: „wpisuje” numer breloka i naciska Enter. */
+let bufor = '', ostatniKlawisz = 0;
+window.addEventListener('keydown', ev => {
+  const t = ev.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+  const teraz = Date.now();
+  if (teraz - ostatniKlawisz > 1000) bufor = '';
+  ostatniKlawisz = teraz; S.dotyk = teraz;
+  if (ev.key === 'Enter' || ev.key === 'Tab') {
+    ev.preventDefault();
+    const kod = bufor.trim(); bufor = '';
+    if (kod.length >= 4) obsluzBrelok(kod);
+    return;
+  }
+  if (ev.key && ev.key.length === 1 && !ev.ctrlKey && !ev.altKey && !ev.metaKey) { ev.preventDefault(); bufor += ev.key; }
+}, true);
+
+window.addEventListener('online', () => { S.sync.blad = null; sync(); pobierzKonfiguracje(); });
+window.addEventListener('offline', () => { S.sync.blad = 'Brak połączenia'; renderSync(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { trzymajEkran(); sync(); } });
+
+let blokadaEkranu = null;
+async function trzymajEkran() {
+  try {
+    if ('wakeLock' in navigator && !blokadaEkranu && document.visibilityState === 'visible') {
+      blokadaEkranu = await navigator.wakeLock.request('screen');
+      blokadaEkranu.addEventListener('release', () => { blokadaEkranu = null; });
+    }
+  } catch (e) { /* niedostępne */ }
+}
+
+function tick() {
+  const d = new Date();
+  const z = $('#zegar'); if (z) z.textContent = godz(d);
+  const zd = $('#zegar-duzy'); if (zd) zd.textContent = godz(d);
+  const dd = $('#data-duza'); if (dd) dd.textContent = `${dataTekst(d)}, zmiana ${obliczZmiane(d).nr}`;
+  if (S.ekran === 'rcp' && S.rcp) {
+    const o = $('#rcp-odl'); if (o && S.rcp.auto) o.textContent = Math.max(1, Math.ceil((S.rcp.auto.do - Date.now()) / 1000));
+    if (!S.rcp.auto && !S.modal && Date.now() - S.dotyk > 20000) wyloguj(true);
+  }
+  if (S.ekran === 'login' && S.wybor && Date.now() > S.wybor.do && !S.modal) { S.wybor = null; renderAll(); }
+  if (S.baner && (Date.now() > S.baner.do || S.ekran !== 'praca')) ukryjBaner();
+  if (blokadaAktywna() && S.ekran === 'login') {
+    const t = $('#blok-trwa'); if (t) t.textContent = `, trwa ${czasTrwania(Date.now() - S.blokada.czas)}`;
+    if ($('#blok-cofnij') && Date.now() - S.blokada.od >= 10000 && !S.modal) renderAll();
+  }
+  if (S.ekran === 'praca' && S.operator && !['ust', 'pin', 'admin'].includes(S.modal)) {
+    const limit = cu().autoWylogowanieS * 1000;
+    const zostalo = Math.ceil((limit - (Date.now() - S.dotyk)) / 1000);
+    const o = $('#odliczanie'); if (o) o.textContent = zostalo <= 10 && zostalo > 0 ? `wylogowanie za ${zostalo} s` : '';
+    if (zostalo <= 0) wyloguj(false, `Po ${cu().autoWylogowanieS} s bez dotyku. Przyłóż brelok, żeby wrócić.`);
+  }
+}
+
+function czytajParametry() {
+  const q = new URLSearchParams(location.search);
+  if (!['api', 'token', 'stanowisko', 'urzadzenie', 'demo', 'tryb'].some(k => q.has(k))) return;
+  const stareApi = S.ust.api;
+  if (q.has('api')) S.ust.api = q.get('api').trim();
+  if (q.has('token')) S.ust.token = q.get('token').trim();
+  if (q.has('stanowisko')) S.ust.stanowisko = q.get('stanowisko').trim();
+  if (q.has('urzadzenie')) S.ust.urzadzenie = q.get('urzadzenie').trim();
+  if (q.has('demo')) S.ust.demo = q.get('demo') === '1';
+  if (TRYBY.some(([v]) => v === q.get('tryb'))) { S.ust.tryb = q.get('tryb'); S.ust.trybWybrany = true; }
+  if (q.has('api')) S.ust.demo = q.get('demo') === '1';
+  if (S.ust.api !== stareApi) { S.config = null; LS.set('config', null); }
+  LS.set('ust', S.ust);
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* bez znaczenia */ }
+}
+
+function start() {
+  czytajParametry();
+  renderAll();
+  setInterval(tick, 1000);
+  setInterval(sync, 15000);
+  setInterval(() => pobierzKonfiguracje(), 5 * 60 * 1000);
+  pobierzKonfiguracje(); sync();
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* bez trybu offline dla samej strony */ });
+  }
+}
+start();
+</script>
+</body>
+</html>
