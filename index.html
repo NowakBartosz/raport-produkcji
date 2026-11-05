@@ -169,10 +169,24 @@ svg{display:block}
 .ev-male .ev svg{width:30px;height:30px}
 .ev-male .ev-nazwa{font-size:24px}
 .ev.przygas{opacity:.45}
-.zd-pasek{flex:none;grid-template-columns:repeat(3,1fr);gap:10px}
-.zd-pasek .ev{min-height:64px;padding:10px 12px;gap:10px}
-.zd-pasek .ev svg{width:26px;height:26px}
-.zd-pasek .ev-nazwa{font-size:20px;line-height:1.05}
+.wyjscie{flex:1;min-height:0;display:flex;flex-direction:column;gap:18px;padding:22px 28px 26px}
+.wyj-glowa{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding-right:110px}
+.wyj-glowa .rcp-imie{font-size:clamp(40px,4.6vw,64px)}
+.wyj-glowa .rcp-stan{margin-top:8px;font-size:22px}
+.wyj-zegar{font-family:var(--war);font-weight:600;font-size:44px;font-variant-numeric:tabular-nums}
+.wyj-siatka{flex:1;min-height:0;gap:18px}
+.wyj-siatka .ev{padding:28px 34px;gap:14px}
+.wyj-siatka .ev svg{width:72px;height:72px}
+.wyj-siatka .ev-nazwa{font-size:clamp(36px,4.4vw,60px)}
+.ev-WROC{background:var(--jasny);color:var(--tusz);border:2px solid var(--krawedz);border-bottom-width:7px}
+.ev-WROC .ev-pod{color:var(--tusz2)}
+#podpowiedz{position:fixed;z-index:18;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:12px;
+  padding:30px 44px;border-radius:16px;background:rgba(30,37,39,.94);color:#fff;text-align:center;pointer-events:none;max-width:90vw;
+  animation:pojaw .14s ease-out}
+#podpowiedz[hidden]{display:none}
+#podpowiedz .fob{width:96px;height:96px;color:#fff}
+#podpowiedz b{font-family:var(--war);font-size:56px;line-height:1}
+#podpowiedz span{font-size:30px;font-weight:700}
 .rcp-wybor p{margin:0 0 12px;color:var(--tusz2);font-size:18px}
 .rcp-wybor b{color:var(--tusz)}
 .rcp{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,.75fr) minmax(0,1.4fr);gap:24px;padding:20px 20px 20px 28px}
@@ -310,6 +324,7 @@ body.ma-pasek #admin-btn{display:none}
   .fob .fala{animation:none;opacity:1}
   .potw,.rcp-potw{animation:none}
   .ev-pasek{animation:none;width:100%;opacity:.5}
+  #podpowiedz{animation:none}
   .baner-zm{animation:none}
 }
 </style>
@@ -318,11 +333,12 @@ body.ma-pasek #admin-btn{display:none}
 <div id="app"></div>
 <div id="modal" hidden></div>
 <div id="toast" role="status" hidden></div>
+<div id="podpowiedz" role="status" hidden></div>
 <button id="admin-btn" data-a="admin">Admin</button>
 
 <script>
 'use strict';
-const WERSJA = '1.3';
+const WERSJA = '1.4';
 
 /* ======================= dane demonstracyjne ======================= */
 const DEMO = {
@@ -452,6 +468,7 @@ const IKONY_ZD = {
   SLUZ: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
 };
 const IKONA_KLODKA = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><path d="M12 14.5v2.5"/></svg>`;
+IKONY_ZD.WROC = '<path d="M9 14l-5-5 5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>';
 const svgZd = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IKONY_ZD[k]}</svg>`;
 
 /* ======================= status wysyłki ======================= */
@@ -537,6 +554,7 @@ function renderAll() {
   const pasek = b => document.body.classList.toggle('ma-pasek', b);
   if (S.ekran === 'rcp' && S.operator && S.rcp) { app.innerHTML = `<header class="bar" id="bar"></header>${htmlRcp()}`; renderBar(); pasek(true); return; }
   if (S.ekran === 'rcpPotw' && S.rcpPotw) { app.innerHTML = htmlRcpPotw(); pasek(false); return; }
+  if (S.ekran === 'wyjscie' && S.operator) { app.innerHTML = htmlWyjscie(); pasek(false); return; }
   if (S.ekran === 'praca' && S.operator) {
     app.innerHTML = `<header class="bar" id="bar"></header>
       <main class="praca"><section id="zlecenia" aria-label="Zlecenia"></section><section id="wpis" aria-label="Ilość"></section></main>`;
@@ -586,13 +604,11 @@ function renderZlecenia() {
   const p = podsumowanieZmiany();
   const oba = tryb() === 'oba';
   const st = oba ? stanPracownika(S.operator.uid) : null;
-  const pasek = oba ? `<div class="ev-siatka ev-male zd-pasek">${['PRYW', 'SLUZ', 'KONIEC'].map(k =>
-    `<button class="ev ev-${k}" data-a="rcpZPracy" data-v="${k}">${svgZd(k)}<span class="ev-nazwa">${NAZWA_ZD[k]}</span></button>`).join('')}</div>` : '';
   el.innerHTML = `<div class="sekcja-glowa"><h2>Zlecenie</h2><span>${lista.length ? 'dotknij detalu, który robisz' : ''}</span></div>${kafle}
     ${S.baner ? `<div class="baner-zm" role="status"><span>${esc(S.baner.tekst)}</span>
       <button class="btn btn-maly" data-a="banerCofnij" data-v="${esc(S.baner.id)}">Cofnij</button></div>`
     : `<div class="moja-zmiana"><span class="tyt">Twoja zmiana<small>${st && st.klasa === 'praca' ? `w pracy od ${esc(kiedy(st.czas))}` : 'na tym tablecie'}</small></span>
-    <span class="staty"><span>Dobre<b>${p.ok}</b></span><span>Braki<b>${p.nok}</b></span><span>Wpisy<b>${p.n}</b></span></span></div>`}${pasek}`;
+    <span class="staty"><span>Dobre<b>${p.ok}</b></span><span>Braki<b>${p.nok}</b></span><span>Wpisy<b>${p.n}</b></span></span></div>`}`;
 }
 
 function walidacja() {
@@ -811,12 +827,19 @@ function rejestruj(kod) {
 }
 
 /* ---------- tryb „oba”: brelok od razu otwiera zlecenia i raport ---------- */
-function wejscieDoPracy(p) {
+function wejscieDoPracy(p, znanyStan) {
   clearTimeout(S.timery.auto); clearTimeout(S.timery.rcpPotw); clearTimeout(S.timery.start);
   S.operator = p; S.wybrane = null; S.ok = ''; S.nok = ''; S.pole = 'ok'; S.przyczyna = null; S.potw = null;
-  S.rcp = null; S.rcpPotw = null; S.komunikat = null; S.wybor = null; S.dotyk = Date.now();
+  S.rcp = null; S.rcpPotw = null; S.komunikat = null; S.wybor = null; S.dotyk = Date.now(); S.wejscieOd = Date.now();
   S.ekran = 'praca';
   if (navigator.vibrate) navigator.vibrate(40);
+  if (znanyStan) { // powrót na zablokowane stanowisko: wiadomo, że pracownik był na wyjściu – zapis od razu
+    S.oczekujeStart = null;
+    const e = zapiszZdarzenie('START', znanyStan);
+    S.baner = { tekst: tekstBanera(e), id: e.id, do: Date.now() + 10000 };
+    renderAll();
+    return;
+  }
   const stan = stanPracownika(p.uid);
   if (stan.klasa === 'praca') { S.oczekujeStart = null; renderAll(); odswiezStan(p.uid); return; }
   // wg pamięci tabletu pracownik nie jest w pracy: krótko sprawdzamy arkusz, potem zapisujemy początek pracy (albo powrót z wyjścia)
@@ -834,8 +857,48 @@ function rozstrzygnijStart() {
   const stan = stanPracownika(o.uid);
   if (stan.klasa === 'praca') { if (S.ekran === 'praca') renderZlecenia(); return; }
   const e = zapiszZdarzenie('START', stan, new Date(o.ts));
-  pokazBaner(e.powrotZ ? `Zapisano powrót z wyjścia ${e.powrotZ === 'prywatne' ? 'prywatnego' : 'służbowego'} (${czasTrwania(e.trwanie)})`
-    : `Zapisano: Początek pracy, ${godz(new Date(e.ts))}`, e.id);
+  pokazBaner(tekstBanera(e), e.id);
+}
+const tekstBanera = e => (e.powrotZ ? `Zapisano powrót z wyjścia ${e.powrotZ === 'prywatne' ? 'prywatnego' : 'służbowego'} (${czasTrwania(e.trwanie)})`
+  : `Zapisano: Początek pracy, ${godz(new Date(e.ts))}`);
+
+/* ---------- ekran wyboru wyjścia (brelok przyłożony na ekranie raportu) ---------- */
+function otworzWyjscie() {
+  if (S.oczekujeStart) rozstrzygnijStart();
+  S.ekran = 'wyjscie'; S.wyjscieOd = Date.now(); S.dotyk = Date.now();
+  renderAll();
+}
+function htmlWyjscie() {
+  const st = stanPracownika(S.operator.uid);
+  const niezapisane = S.ok || S.nok;
+  const przycisk = k => `<button class="ev ev-${k}" data-a="rcpZPracy" data-v="${k}">${svgZd(k)}<span class="ev-nazwa">${NAZWA_ZD[k]}</span></button>`;
+  return `<main class="wyjscie">
+    <div class="wyj-glowa"><div><h1 class="rcp-imie">${esc(S.operator.imie)}</h1>
+      <div class="rcp-stan st-${st.klasa}"><i></i><div>${esc(opisStanu(st).tytul)}</div></div></div>
+      <span class="wyj-zegar" id="zegar">${godz(new Date())}</span></div>
+    ${niezapisane ? '<div class="komunikat"><p>Masz wpisaną ilość, która nie jest zapisana. Wróć do raportu, żeby ją zapisać.</p></div>' : ''}
+    <div class="ev-siatka wyj-siatka">${przycisk('PRYW')}${przycisk('SLUZ')}${przycisk('KONIEC')}
+      <button class="ev ev-WROC" data-a="wrocDoRaportu">${svgZd('WROC')}<span class="ev-nazwa">Wróć do raportu</span><span class="ev-pod">albo przyłóż brelok jeszcze raz</span></button>
+    </div></main>`;
+}
+
+/* ---------- stuknięcie w pusty fragment ekranu ---------- */
+function podpowiedz(tytul, tekst, zBrelokiem) {
+  const el = $('#podpowiedz');
+  el.innerHTML = `${zBrelokiem ? IKONA_BRELOK : ''}${tytul ? `<b>${esc(tytul)}</b>` : ''}<span>${esc(tekst)}</span>`;
+  el.hidden = true; void el.offsetWidth; el.hidden = false; // ponowne uruchomienie animacji
+  clearTimeout(S.timery.podp);
+  S.timery.podp = setTimeout(() => { el.hidden = true; }, 2500);
+}
+function naStukniecie() {
+  if (S.modal) return;
+  if (S.ekran === 'rcpPotw') { wyloguj(true); return; }
+  if (S.ekran === 'wyjscie') { podpowiedz('', 'Wybierz rodzaj wyjścia albo „Wróć do raportu”'); return; }
+  if (S.ekran === 'rcp') { podpowiedz('', 'Wybierz zdarzenie'); return; }
+  if (S.ekran === 'login' && skonfigurowany()) {
+    if (blokadaAktywna()) podpowiedz('Blokada', 'Przyłóż brelok do czytnika', true);
+    else podpowiedz('', 'Przyłóż brelok do czytnika', true);
+  }
 }
 
 /* potwierdzenie początku pracy w miejscu podsumowania zmiany – nie zasłania zleceń ani klawiatury */
@@ -876,9 +939,11 @@ function htmlBlokada() {
 function obsluzBlokade(kod, uid, p) {
   const b = S.blokada;
   if (p && p.aktywny && normUid(b.uid) === uid) {
-    if (Date.now() - b.od < 8000) { toast(`Już zapisano: ${NAZWA_ZD[b.kod]}`); return; } // podwójny odczyt breloka
+    if (Date.now() - b.od < 1500) return; // ten sam odczyt breloka powtórzony przez czytnik
     odblokuj();
-    wejscieDoPracy(Object.assign({}, p, { uid }));
+    const znany = b.kod === 'KONIEC' ? { klasa: 'poza', kod: 'KONIEC', czas: b.czas }
+      : { klasa: b.kod === 'PRYW' ? 'prywatne' : 'sluzbowe', kod: b.kod, czas: b.czas };
+    wejscieDoPracy(Object.assign({}, p, { uid }), znany);
     return;
   }
   S.komBlokady = !p ? { typ: 'nieznany', uid: kod } : { typ: p.aktywny ? 'obcy' : 'nieaktywny', imie: p.imie };
@@ -981,7 +1046,12 @@ function obsluzBrelok(kod, symulacja) {
   }
   if (!p.aktywny) { S.wybor = null; wyloguj(true); komunikat({ typ: 'nieaktywny', imie: p.imie }); return; }
   if (tryb() === 'oba') {
-    if (S.ekran === 'praca' && S.operator && S.operator.uid === uid) { S.dotyk = Date.now(); toast(`Jesteś zalogowany: ${p.imie}`); return; }
+    if ((S.ekran === 'praca' || S.ekran === 'wyjscie') && S.operator && S.operator.uid === uid) {
+      S.dotyk = Date.now();
+      if (S.ekran === 'praca') { if (Date.now() - (S.wejscieOd || 0) > 2000) otworzWyjscie(); } // 2 s: podwójny odczyt przy logowaniu
+      else if (Date.now() - S.wyjscieOd > 2000) AKCJE.wrocDoRaportu();
+      return;
+    }
     wejscieDoPracy(Object.assign({}, p, { uid }));
     return;
   }
@@ -1223,7 +1293,7 @@ function wynikUst(tekst, klasa) { const w = $('#u-wynik'); if (w) { w.className 
 const AKCJE = {
   logo() {
     const t = Date.now(); S.taps = S.taps.filter(x => t - x < 3000); S.taps.push(t);
-    if (S.taps.length >= 5) { S.taps = []; AKCJE.admin(); }
+    if (S.taps.length >= 5) { S.taps = []; AKCJE.admin(); } else naStukniecie();
   },
   admin() {
     if (S.modal === 'admin') return;
@@ -1297,6 +1367,7 @@ const AKCJE = {
     S.rcp = { stan: stanPracownika(S.operator.uid), auto: null, komunikat: null };
     ustawAuto(); S.ekran = 'rcp'; S.dotyk = Date.now(); renderAll(); odswiezStan(S.operator.uid);
   },
+  wrocDoRaportu() { if (!S.operator) return; S.ekran = 'praca'; S.dotyk = Date.now(); S.wejscieOd = Date.now(); renderAll(); },
   rcpZPracy(v) {
     if (!S.operator) return;
     if (S.oczekujeStart) rozstrzygnijStart();
@@ -1396,7 +1467,8 @@ const AKCJE = {
 /* ======================= zdarzenia ======================= */
 document.addEventListener('click', ev => {
   const el = ev.target.closest('[data-a]');
-  if (!el || el.disabled) return;
+  if (!el) { if (!ev.target.closest('#modal, input, label, select, textarea, button')) naStukniecie(); return; }
+  if (el.disabled) return;
   const fn = AKCJE[el.dataset.a];
   if (fn) fn(el.dataset.v, el);
   if (el.blur) el.blur();
@@ -1445,6 +1517,7 @@ function tick() {
     if (!S.rcp.auto && !S.modal && Date.now() - S.dotyk > 20000) wyloguj(true);
   }
   if (S.ekran === 'login' && S.wybor && Date.now() > S.wybor.do && !S.modal) { S.wybor = null; renderAll(); }
+  if (S.ekran === 'wyjscie' && !S.modal && Date.now() - S.dotyk > 20000) wyloguj(true);
   if (S.baner && (Date.now() > S.baner.do || S.ekran !== 'praca')) ukryjBaner();
   if (blokadaAktywna() && S.ekran === 'login') {
     const t = $('#blok-trwa'); if (t) t.textContent = `, trwa ${czasTrwania(Date.now() - S.blokada.czas)}`;
