@@ -338,7 +338,7 @@ body.ma-pasek #admin-btn{display:none}
 
 <script>
 'use strict';
-const WERSJA = '1.4';
+const WERSJA = '1.4.1';
 
 /* ======================= dane demonstracyjne ======================= */
 const DEMO = {
@@ -359,14 +359,14 @@ const DEMO = {
   ],
   przyczyny: ['Wymiar poza tolerancją', 'Uszkodzenie powierzchni', 'Wada materiału', 'Ustawianie maszyny', 'Złe narzędzie', 'Inna'],
   stanowiska: ['CNC-01', 'CNC-02', 'Prasa-1', 'Spawanie-2', 'Montaż-1'],
-  ustawienia: { pinAdmina: '1234', autoWylogowanieS: 60, zmiany: '6,14,22', potwierdzPowyzej: 500, rcpTryb: 'PODPOWIEDZ', rcpAutoS: 3, maxZmianaH: 16, blokadaWyjscie: true, blokadaKoniec: true },
+  ustawienia: { pinAdmina: '1234', autoWylogowanieS: 60, zmiany: '6,14,22', potwierdzPowyzej: 500, rcpTryb: 'PODPOWIEDZ', rcpAutoS: 3, maxZmianaH: 16, blokadaWyjscie: true },
   obecnosc: [ // Anna jest w pracy od 3 godzin, Piotr od 20 minut na wyjściu prywatnym, Jan jeszcze nie zaczął
     { uid: '7654321', kod: 'START', czas: new Date(Date.now() - 3.2 * 3600e3).toISOString(), id: 'demo-1' },
     { uid: '11223344', kod: 'PRYW', czas: new Date(Date.now() - 20 * 60e3).toISOString(), id: 'demo-2' },
   ],
 };
 const DOMYSLNE = { pinAdmina: '1234', autoWylogowanieS: 60, zmiany: '6,14,22', potwierdzPowyzej: 500, rcpTryb: 'PODPOWIEDZ', rcpAutoS: 3, maxZmianaH: 16,
-  blokadaWyjscie: true, blokadaKoniec: true };
+  blokadaWyjscie: true };
 const TRYBY = [['rcp', 'Czas pracy'], ['produkcja', 'Raport produkcji'], ['oba', 'Czas pracy i raport produkcji']];
 const ZD = ['START', 'KONIEC', 'PRYW', 'SLUZ']; // kolejność przycisków 2×2
 const NAZWA_ZD = { START: 'Początek pracy', KONIEC: 'Koniec pracy', PRYW: 'Wyjście prywatne', SLUZ: 'Wyjście służbowe' };
@@ -403,6 +403,7 @@ const S = {
   wLocie: new Set(), zgloszone: new Set(), timery: {},
 };
 if (!S.ust.trybWybrany) S.ust.tryb = 'oba';
+if (S.blokada && S.blokada.kod === 'KONIEC') { S.blokada = null; LS.set('blokada', null); } // od wersji 1.4.1 koniec pracy nie blokuje
 if (!S.urzadzenieId) { S.urzadzenieId = 'Tablet-' + uuid().slice(0, 4).toUpperCase(); LS.set('urzadzenieId', S.urzadzenieId); }
 
 const zapiszKolejke = () => LS.set('kolejka', S.kolejka);
@@ -548,7 +549,7 @@ function dopasujTabliczke() {
 window.addEventListener('resize', () => dopasujTabliczke());
 
 /* ======================= ekran pracy ======================= */
-const blokadaAktywna = () => !!S.blokada && tryb() === 'oba';
+const blokadaAktywna = () => !!S.blokada && S.blokada.kod !== 'KONIEC' && tryb() === 'oba';
 function renderAll() {
   const app = $('#app');
   const pasek = b => document.body.classList.toggle('ma-pasek', b);
@@ -819,10 +820,11 @@ function rejestruj(kod) {
   if (S.oczekujeStart) rozstrzygnijStart();
   const stan = S.rcp ? S.rcp.stan : stanPracownika(S.operator.uid);
   const e = zapiszZdarzenie(kod, stan);
-  if (tryb() === 'oba' && kod !== 'START' && (kod === 'KONIEC' ? cu().blokadaKoniec : cu().blokadaWyjscie)) { zablokuj(e); return; }
+  if (tryb() === 'oba' && (kod === 'PRYW' || kod === 'SLUZ') && cu().blokadaWyjscie) { zablokuj(e); return; }
+  // koniec pracy (i zdarzenia bez blokady): krótkie potwierdzenie, potem ekran startowy – stanowisko wolne dla następnej osoby
   S.rcpPotw = e; S.rcp = null; S.ekran = 'rcpPotw';
   clearTimeout(S.timery.rcpPotw);
-  S.timery.rcpPotw = setTimeout(() => { if (S.ekran === 'rcpPotw') wyloguj(true); }, 6000);
+  S.timery.rcpPotw = setTimeout(() => { if (S.ekran === 'rcpPotw') wyloguj(true); }, tryb() === 'oba' ? 4000 : 6000);
   renderAll();
 }
 
@@ -1046,6 +1048,7 @@ function obsluzBrelok(kod, symulacja) {
   }
   if (!p.aktywny) { S.wybor = null; wyloguj(true); komunikat({ typ: 'nieaktywny', imie: p.imie }); return; }
   if (tryb() === 'oba') {
+    if (S.ekran === 'rcpPotw' && S.rcpPotw && normUid(S.rcpPotw.uid) === uid) { toast(`Już zapisano: ${NAZWA_ZD[S.rcpPotw.zdarzenie]}`); return; }
     if ((S.ekran === 'praca' || S.ekran === 'wyjscie') && S.operator && S.operator.uid === uid) {
       S.dotyk = Date.now();
       if (S.ekran === 'praca') { if (Date.now() - (S.wejscieOd || 0) > 2000) otworzWyjscie(); } // 2 s: podwójny odczyt przy logowaniu
@@ -1353,6 +1356,7 @@ const AKCJE = {
     clearTimeout(S.timery.rcpPotw);
     const e = cofnijRcp(id);
     if (!e || !S.operator) { wyloguj(true); return; }
+    if (tryb() === 'oba') { toast(`Cofnięto: ${NAZWA_ZD[e.zdarzenie]}`); wejscieDoPracy(S.operator); return; } // wraca do raportu
     S.rcpPotw = null;
     S.rcp = { stan: stanPracownika(S.operator.uid), auto: null, info: true,
       komunikat: `Cofnięto: ${NAZWA_ZD[e.zdarzenie]}. Wybierz właściwe zdarzenie albo naciśnij Anuluj.` };
