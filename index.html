@@ -338,7 +338,7 @@ body.ma-pasek #admin-btn{display:none}
 
 <script>
 'use strict';
-const WERSJA = '1.4.1';
+const WERSJA = '1.4.2';
 
 /* ======================= dane demonstracyjne ======================= */
 const DEMO = {
@@ -1521,13 +1521,14 @@ function tick() {
     if (!S.rcp.auto && !S.modal && Date.now() - S.dotyk > 20000) wyloguj(true);
   }
   if (S.ekran === 'login' && S.wybor && Date.now() > S.wybor.do && !S.modal) { S.wybor = null; renderAll(); }
-  if (S.ekran === 'wyjscie' && !S.modal && Date.now() - S.dotyk > 20000) wyloguj(true);
+  if (S.ekran === 'wyjscie' && !S.modal && Date.now() - S.dotyk > 20000) AKCJE.wrocDoRaportu(); // bez wyboru – z powrotem do raportu
   if (S.baner && (Date.now() > S.baner.do || S.ekran !== 'praca')) ukryjBaner();
   if (blokadaAktywna() && S.ekran === 'login') {
     const t = $('#blok-trwa'); if (t) t.textContent = `, trwa ${czasTrwania(Date.now() - S.blokada.czas)}`;
     if ($('#blok-cofnij') && Date.now() - S.blokada.od >= 10000 && !S.modal) renderAll();
   }
-  if (S.ekran === 'praca' && S.operator && !['ust', 'pin', 'admin'].includes(S.modal)) {
+  // w trybie „czas pracy + raport” pracownik zostaje zalogowany aż do wyjścia, końca pracy, „Wyloguj” albo breloka innej osoby
+  if (S.ekran === 'praca' && S.operator && tryb() !== 'oba' && !['ust', 'pin', 'admin'].includes(S.modal)) {
     const limit = cu().autoWylogowanieS * 1000;
     const zostalo = Math.ceil((limit - (Date.now() - S.dotyk)) / 1000);
     const o = $('#odliczanie'); if (o) o.textContent = zostalo <= 10 && zostalo > 0 ? `wylogowanie za ${zostalo} s` : '';
